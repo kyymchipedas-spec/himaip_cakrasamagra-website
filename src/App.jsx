@@ -263,7 +263,7 @@ function Beranda({ eventsCount, photosCount, lpjCount, onGoGaleri, onGoLpj }) {
     <section>
       <div style={styles.hero}>
         <video autoPlay loop muted playsInline style={styles.heroVideo}>
-          <source src="/video-hima-ip.mp4" type="video/mp4" />
+          <source src="/video-himaip.mp4" type="video/mp4" />
         </video>
         <div style={styles.heroOverlay} />
         <div style={styles.heroKabinetLogo}>
