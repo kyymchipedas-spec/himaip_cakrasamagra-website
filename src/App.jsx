@@ -195,7 +195,7 @@ export default function App() {
         <div style={styles.headerInner}>
           <div style={styles.brandRow}>
             <div style={styles.logoWrap}>
-              <img src="/logo-himaip.png" alt="Logo HIMA IP" style={styles.logoImg}
+              <img src="/logo-kabinet.png" alt="Logo HIMA IP" style={styles.logoImg}
                 onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }} />
               <div style={{ display: "none", width: 40, height: 40, color: "white" }}><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="2"/><text x="50" y="55" textAnchor="middle" fontSize="20" fontWeight="700" fill="currentColor">IP</text></svg></div>
             </div>
@@ -266,10 +266,6 @@ function Beranda({ eventsCount, photosCount, lpjCount, onGoGaleri, onGoLpj }) {
           <source src="/video-himaip.mp4" type="video/mp4" />
         </video>
         <div style={styles.heroOverlay} />
-        <div style={styles.heroKabinetLogo}>
-          <img src="/logo-kabinet.png" alt="Logo Kabinet"
-            style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0.5 }}
-            onError={(e) => { e.target.style.display = "none"; }} />
         </div>
         <div style={styles.heroEyebrow}>HIMPUNAN MAHASISWA ILMU PEMERINTAHAN STISIP TASIKMALAYA</div>
         <h1 style={styles.heroTitle}>Cakra Samagra<br />Periode 2026–2027</h1>
