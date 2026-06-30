@@ -70,11 +70,11 @@ function Footer() {
         <div style={styles.footerSosmed}>
           <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Ikuti Kami</div>
           <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-            <a href={SOSMED.instagram} target="_blank" rel="noreferrer" style={styles.https://www.instagram.com/hima_ip_stisiptasik?igsh=aDZ6ZHNtN2VlcGh4} title="Instagram">
+            <a href={SOSMED.instagram} target="_blank" rel="noreferrer" style={styles.@hima_ip_stisiptasik} title="Instagram">
               <IconInstagram />
               <span>Instagram</span>
             </a>
-            <a href={SOSMED.tiktok} target="_blank" rel="noreferrer" style={styles.https://www.tiktok.com/@hima_ip_stisiptasik?_r=1&_t=ZS-97e9QDUblob} title="TikTok">
+            <a href={SOSMED.tiktok} target="_blank" rel="noreferrer" style={styles.hima_ip_stisiptasik} title="TikTok">
               <IconTiktok />
               <span>TikTok</span>
             </a>
