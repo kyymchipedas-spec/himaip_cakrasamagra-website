@@ -285,7 +285,8 @@ function Beranda({ eventsCount, photosCount, onGoGaleri, onGoAnggota }) {
         <div style={styles.heroOverlay} />
         <div style={styles.heroEyebrow}>HIMPUNAN MAHASISWA ILMU PEMERINTAHAN STISIP TASIKMALAYA</div>
         <h1 style={styles.heroTitle}>Cakra Samagra<br />Periode 2026–2027</h1>
-        <p style={styles.heroText}>Setiap kegiatan dicatat, setiap berkas diarsipkan. Ruang ini menyimpan jejak kerja Himpunan Mahasiswa Ilmu Pemerintahan — dari forum diskusi hingga malam keakraban, dari proposal hingga laporan akhir masa jabatan.</p>
+        <p style={styles.heroText}>Di pusaran harapan, kami bertumbuh dalam keikhlasan, melangkah bersama, menyatukan bangsa dalam panduan."
+Bersama Almamater, berkarya untuk bangsa.</p>
         <div style={{ position: "relative", zIndex: 2, display: "flex", gap: 12, flexWrap: "wrap", marginTop: 26 }}>
           <button style={styles.primaryBtn} onClick={onGoGaleri}>Lihat Galeri Kegiatan</button>
           <button style={styles.ghostBtnLight} onClick={onGoAnggota}>Lihat Anggota</button>
