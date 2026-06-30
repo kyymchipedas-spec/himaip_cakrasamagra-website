@@ -517,7 +517,7 @@ const styles = {
   loadingText: { textAlign: "center", padding: 80, color: C.muted },
   hero: { position: "relative", borderRadius: 16, overflow: "hidden", marginTop: 32, minHeight: 400, display: "flex", flexDirection: "column", justifyContent: "center", padding: "60px 48px", color: C.white },
   heroVideo: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 },
-  heroOverlay: { position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(10,22,40,0.88) 0%, rgba(10,22,40,0.65) 100%)", zIndex: 1 },
+  heroOverlay: { position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(10,22,40,0.55) 0%, rgba(10,22,40,0.35) 100%)", zIndex: 1 },
   heroKabinetLogo: { position: "absolute", right: 40, top: "50%", transform: "translateY(-50%)", width: 200, height: 200, zIndex: 2 },
   heroEyebrow: { position: "relative", zIndex: 2, fontSize: 11, letterSpacing: 3, fontWeight: 600, color: C.gold, textTransform: "uppercase", marginBottom: 14 },
   heroTitle: { position: "relative", zIndex: 2, fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 800, lineHeight: 1.15, margin: "0 0 18px", color: C.white },
