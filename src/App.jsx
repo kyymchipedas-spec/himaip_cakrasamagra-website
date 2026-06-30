@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 
 const ADMIN_CODE = "himaip2026";
 const SOSMED = {
-  instagram: "https://instagram.com/himaip_stisip",
-  tiktok: "https://tiktok.com/@himaip_stisip",
-  email: "mailto:himaip.stisip@gmail.com",
+  instagram: "https://instagram.com/hima_ip_stisiptasik",
+  tiktok: "https://tiktok.com/@hima_ip_stisiptasik",
+  email: "mailto:himaipstisiptasik@gmail.com",
 };
 
 function compressImage(file, maxW = 1000, quality = 0.72) {
