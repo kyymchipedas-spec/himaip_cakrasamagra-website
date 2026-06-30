@@ -268,7 +268,7 @@ function Beranda({ eventsCount, photosCount, lpjCount, onGoGaleri, onGoLpj }) {
         <div style={styles.heroOverlay} />
         <div style={styles.heroKabinetLogo}>
           <img src="/logo-kabinet.png" alt="Logo Kabinet"
-            style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0.25 }}
+            style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0.5 }}
             onError={(e) => { e.target.style.display = "none"; }} />
         </div>
         <div style={styles.heroEyebrow}>HIMPUNAN MAHASISWA ILMU PEMERINTAHAN STISIP TASIKMALAYA</div>
