@@ -68,7 +68,7 @@ function Footer() {
           </div>
         </div>
         <div style={styles.footerSosmed}>
-          <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Ikuti Kami</div>
+          <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Follow Us;</div>
           <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
             <a href={SOSMED.instagram} target="_blank" rel="noreferrer" style={styles.hima_ip_stisiptasik} title="Instagram">
               <IconInstagram />
