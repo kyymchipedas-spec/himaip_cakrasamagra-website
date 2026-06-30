@@ -269,7 +269,7 @@ function Beranda({ eventsCount, photosCount, lpjCount, onGoGaleri, onGoLpj }) {
         
         <div style={styles.heroEyebrow}>HIMPUNAN MAHASISWA ILMU PEMERINTAHAN STISIP TASIKMALAYA</div>
         <h1 style={styles.heroTitle}>Cakra Samagra<br />Periode 2026–2027</h1>
-        <p style={styles.heroText}>Setiap kegiatan dicatat, setiap berkas diarsipkan. Ruang ini menyimpan jejak kerja Himpunan Mahasiswa Ilmu Pemerintahan — dari forum diskusi hingga malam keakraban, dari proposal hingga laporan akhir masa jabatan.</p>
+        <p style={styles.heroText}>Dari pusaran semangat yang tak pernah berhenti, lahir langkah-langkah yang menyentuh setiap arah, menyeluruh untuk satu tujuan. Bersama Almamater, Berkarya untuk Bangsa</p>
         <div style={{ position: "relative", zIndex: 2, display: "flex", gap: 12, flexWrap: "wrap", marginTop: 26 }}>
           <button style={styles.primaryBtn} onClick={onGoGaleri}>Lihat Galeri Kegiatan</button>
           <button style={styles.ghostBtnLight} onClick={onGoLpj}>Buka LPJ</button>
