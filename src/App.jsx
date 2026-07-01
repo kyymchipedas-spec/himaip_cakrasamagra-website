@@ -327,7 +327,17 @@ function Beranda({ eventsCount, photosCount, onGoGaleri, onGoAnggota }) {
             <div style={styles.navyRule} />
             <p style={styles.navyText}>{VISI}</p>
           </div>
-
+<div
+  style={{
+    width: "100%",
+    height: "4px",
+    margin: "70px 0",
+    borderRadius: "999px",
+    background:
+      "linear-gradient(to right, transparent, #d4af37, #ffd86b, #d4af37, transparent)",
+    boxShadow: "0 0 15px rgba(212,175,55,0.4)",
+  }}
+/>
           {/* MISI */}
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <div style={styles.navyEyebrow}>ORGANISASI</div>
