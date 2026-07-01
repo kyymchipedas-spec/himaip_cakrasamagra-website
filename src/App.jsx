@@ -375,7 +375,8 @@ function LpjSection({ docs, isAdmin, busy, lpjTitle, setLpjTitle, onUpload, onDe
       <div style={styles.lpjLocked}>
         <div style={styles.lpjLockedIcon}>🔒</div>
         <h2 style={styles.lpjLockedTitle}>Akses Terbatas</h2>
-        <p style={styles.lpjLockedText}>Mohon maaf, Anda bukan admin. Silahkan pastikan bahwa Anda yang berwenang dalam mengakses surat-surat ini.</p>
+        <p style={styles.lpjLockedText}>Halaman ini hanya dapat diakses oleh Administrator yang memiliki otorisasi resmi.
+Kamu menemukan pintunya, tetapi belum memiliki kuncinya🔑.</p>
       </div>
     );
   }
