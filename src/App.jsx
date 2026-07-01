@@ -78,9 +78,9 @@ function Footer() {
     <footer style={styles.footer}>
       <div style={styles.footerInner}>
         <div style={styles.footerBrand}>
-          <img src="/logo-himaip.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
+          <img src="/logo-kabinet.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>HIMA IP — STISIP Tasikmalaya</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Cakra Samagra — HIMA IP</div>
             <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
           </div>
         </div>
@@ -375,7 +375,7 @@ function LpjSection({ docs, isAdmin, busy, lpjTitle, setLpjTitle, onUpload, onDe
       <div style={styles.lpjLocked}>
         <div style={styles.lpjLockedIcon}>🔒</div>
         <h2 style={styles.lpjLockedTitle}>Akses Terbatas</h2>
-        <p style={styles.lpjLockedText}>Halaman ini hanya dapat diakses oleh Administrator yang memiliki otoritas resmi. Kamu menemukan pintunya, tapi belum memiliki kuncinya 🔑.</p>
+        <p style={styles.lpjLockedText}>Halaman ini hanya dapat diakses oleh Administrator yang memiliki otoritasi resmi. Kamu menemukan pintunya, tetapi belum memiliki kuncinya 🔑.</p>
       </div>
     );
   }
@@ -642,7 +642,7 @@ const styles = {
   navBtn: { background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer", padding: "6px 12px", fontSize: 14, borderRadius: 6 },
   navBtnActive: { color: C.white, background: "rgba(255,255,255,0.12)", fontWeight: 600 },
   adminBtn: { background: C.red, color: C.white, border: "none", borderRadius: 6, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: 8 },
-  main: { flex: 1, width: "100%", padding: "0 40px" },
+  main: { flex: 1, width: "100%" },
   loadingText: { textAlign: "center", padding: 80, color: C.muted },
   hero: { position: "relative", overflow: "hidden", minHeight: 420, display: "flex", flexDirection: "column", justifyContent: "center", padding: "60px 10% 50px", color: C.white },
   heroVideo: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 },
