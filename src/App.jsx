@@ -642,7 +642,7 @@ const styles = {
   navBtn: { background: "none", border: "none", color: "rgba(255,255,255,0.8)", cursor: "pointer", padding: "6px 12px", fontSize: 14, borderRadius: 6 },
   navBtnActive: { color: C.white, background: "rgba(255,255,255,0.12)", fontWeight: 600 },
   adminBtn: { background: C.red, color: C.white, border: "none", borderRadius: 6, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: 8 },
-  main: { flex: 1, width: "100%" },
+  main: { flex: 1, width: "100%", padding: "0 40px" },
   loadingText: { textAlign: "center", padding: 80, color: C.muted },
   hero: { position: "relative", overflow: "hidden", minHeight: 420, display: "flex", flexDirection: "column", justifyContent: "center", padding: "60px 10% 50px", color: C.white },
   heroVideo: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 },
