@@ -78,9 +78,9 @@ function Footer() {
     <footer style={styles.footer}>
       <div style={styles.footerInner}>
         <div style={styles.footerBrand}>
-          <img src="/logo-kabinet.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
+          <img src="/logo-himaip.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Cakra Samagra — HIMA IP</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>HIMA IP — STISIP Tasikmalaya</div>
             <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
           </div>
         </div>
@@ -375,7 +375,7 @@ function LpjSection({ docs, isAdmin, busy, lpjTitle, setLpjTitle, onUpload, onDe
       <div style={styles.lpjLocked}>
         <div style={styles.lpjLockedIcon}>🔒</div>
         <h2 style={styles.lpjLockedTitle}>Akses Terbatas</h2>
-        <p style={styles.lpjLockedText}>Mohon maaf, Anda bukan admin. Silahkan pastikan bahwa Anda yang berwenang dalam mengakses surat-surat ini.</p>
+        <p style={styles.lpjLockedText}>Halaman ini hanya dapat diakses oleh Administrator yang memiliki otoritas resmi. Kamu menemukan pintunya, tapi belum memiliki kuncinya 🔑.</p>
       </div>
     );
   }
