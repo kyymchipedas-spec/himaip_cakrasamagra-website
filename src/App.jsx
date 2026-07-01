@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 
 const ADMIN_CODE = "himaip2026";
 const SOSMED = {
-  instagram: "https://instagram.com/hima_ip_stisip",
-  tiktok: "https://tiktok.com/@hima_ip_stisip",
-  email: "mailto:himaipstisip@gmail.com",
+  instagram: "https://instagram.com/hima_ip_stisiptasik",
+  tiktok: "https://tiktok.com/@hima_ip_stisiptasik",
+  email: "mailto:himaipstisiptasik@gmail.com",
 };
 
 const VISI = "Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspiratif, serta membangun kerjasama berkoordinatif dengan organisasi intra dan ekstra dan menjadikan organisasi katalisator untuk kepentingan seluruh mahasiswa dilingkungan prodi Ilmu Pemerintahan.";
