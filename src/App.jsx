@@ -78,9 +78,9 @@ function Footer() {
     <footer style={styles.footer}>
       <div style={styles.footerInner}>
         <div style={styles.footerBrand}>
-          <img src="/logo-kabinet.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
+          <img src="/logo-himaip.png" alt="Logo" style={{ width: 44, height: 44, objectFit: "contain" }} onError={(e) => e.target.style.display = "none"} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Cakra Samagra — HIMA IP</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>HIMA IP — STISIP Tasikmalaya</div>
             <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
           </div>
         </div>
