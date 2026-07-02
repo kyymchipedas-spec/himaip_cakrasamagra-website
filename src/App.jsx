@@ -182,8 +182,12 @@ export default function App() {
         <div style={S.modalOverlay} onClick={() => setShowLogin(false)}>
           <div style={S.modalBox} onClick={e => e.stopPropagation()}>
             <div style={S.modalTitle}>Akses Admin</div>
-            <input type="password" value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={e => e.key==="Enter" && tryLogin()} placeholder="Kode admin" style={S.input} autoFocus />
-            {loginError && <div style={S.errorText}>{loginError}</div>}
+            <div style={{position:"relative"}}>
+  <input type={showPass ? "text" : "password"} value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={e => e.key==="Enter" && tryLogin()} placeholder="Kode admin" style={{...S.input, paddingRight:44}} autoFocus />
+  <button type="button" onClick={() => setShowPass(p => !p)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:18,opacity:0.6}}>
+    {showPass ? "🙈" : "👁️"}
+  </button>
+</div>
             <div style={{display:"flex",gap:10,marginTop:14}}>
               <button onClick={tryLogin} style={S.primaryBtn}>Masuk</button>
               <button onClick={() => setShowLogin(false)} style={S.ghostBtn}>Batal</button>
