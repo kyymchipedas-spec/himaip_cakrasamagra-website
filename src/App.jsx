@@ -265,13 +265,14 @@ export default function App() {
             <div style={S.visiSection}>
               <div style={S.visiInner}>
                 <SectionHeader eyebrow="ORGANISASI" title="Visi" light />
-                <p style={S.visiText}>Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspiratif, serta membangun kerjasama berkoordinatif dengan organisasi intra dan ekstra dan menjadikan organisasi katalisator untuk kepentingan seluruh mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya.</p>
+                <p style={S.visiText}>Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspiratif, advokasi, serta membangun kerjasama berkoordinatif dengan organisasi intra dan ekstra dan menjadikan organisasi katalisator untuk kepentingan seluruh mahasiswa dilingkungan prodi Ilmu Pemerintahan.</p>
                 <SectionHeader eyebrow="ORGANISASI" title="Misi" light />
                 <ul style={S.misiList}>
-                  <li>Membangun solidaritas dan kekeluargaan antar anggota HIMA IP</li>
-                  <li>Meningkatkan kualitas akademik dan non-akademik mahasiswa Ilmu Pemerintahan</li>
-                  <li>Menjalin kerjasama dengan organisasi internal dan eksternal kampus</li>
-                  <li>Menjadi wadah aspirasi mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya</li>
+                  <li>Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspitarif dalam menampung, menyalurkan, dan memperjuangkan aspirasi seluruh mahasiswa Ilmu Pemerintahan.</li>
+                  <li>Menguatkan peran advokasi mahasiswa terhadap isu-isu akademik sosial dan kebijakan yang berdampak pada kepentingan mahasiswa.</li>
+                  <li>Membangun dan mempererat kerja sama yang berkoordinatif dan berkelanjutan dengan organisasi intra atau ekstra.</li>
+                  <li>Menjadikan mahasiswa Ilmu Pemerintahan sebagai katalisator gerakan mahasiswa Ilmu Pemerintahan yang berorientasi pada kepentingan bersama dan kemajuan mahasiswa secara kolektif.</li>
+                  <li>Mendorong terciptanya organisasi yang inklusif, partisipatif, dan responsif terhadap dinamika bersama.</li>
                 </ul>
                 <SectionHeader eyebrow="IDENTITAS" title="Makna Logo" light />
                 <p style={S.visiText}>Logo Cakra Samagra menggambarkan roda (cakra) yang berputar selaras — melambangkan pergerakan bersama seluruh elemen mahasiswa Ilmu Pemerintahan yang saling bersinergi demi kemajuan organisasi dan almamater. Warna emas mencerminkan kemuliaan, integritas, dan semangat berkarya.</p>
