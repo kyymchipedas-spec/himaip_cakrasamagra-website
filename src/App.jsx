@@ -475,11 +475,13 @@ export default function App() {
             </div>
           </div>
           <div>
-            <div style={S.footerSectionLabel}>Follow Us</div>
+            <div style={S.footerSectionLabel}>FOLLOW US</div>
             <div style={S.footerSocials}>
               <a href="https://instagram.com/hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>Instagram</a>
-            <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok</a>
-            <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>Email</a>
+              <span style={S.socialSep}>|</span>
+              <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok</a>
+              <span style={S.socialSep}>|</span>
+              <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>Email</a>
             </div>
           </div>
         </div>
@@ -611,8 +613,9 @@ const S = {
   footerTitle:{fontWeight:700,fontSize:15,color:C.gold,letterSpacing:1,marginBottom:6},
   footerSub:{fontSize:13,color:"rgba(255,255,255,0.6)"},
   footerSectionLabel:{fontSize:11,letterSpacing:2,color:C.gold,fontWeight:700,textTransform:"uppercase",marginBottom:12},
-  footerSocials:{display:"flex",flexDirection:"column",gap:10},
+  footerSocials:{display:"flex",flexDirection:"row",alignItem:"center",gap:12,flexWrap:"wrap"},
   socialLink:{color:"rgba(255,255,255,0.8)",fontSize:14,textDecoration:"none",fontWeight:500},
+  socialSep:{color:"rgba(182,138,61,0.5)",fontSize:14},
   gmapsLink:{color:"rgba(255,255,255,0.7)",fontSize:13,textDecoration:"underline",display:"block",marginTop:6},
   footerBottom:{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:20,fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"},
 };
