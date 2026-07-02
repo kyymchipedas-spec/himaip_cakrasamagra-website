@@ -385,7 +385,7 @@ export default function App() {
           </div>
           <div style={S.footerSocials}>
             <a href="https://instagram.com/hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>Instagram</a>
-            <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok / X</a>
+            <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok</a>
             <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>Email</a>
           </div>
         </div>
