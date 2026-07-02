@@ -238,7 +238,7 @@ export default function App() {
         <>
           <div style={S.hero}>
             <video autoPlay loop muted playsInline style={S.heroVideo}>
-              <source src="/video-hima-ip.mp4" type="video/mp4" />
+              <source src="/video-himaip.mp4" type="video/mp4" />
             </video>
             <div style={S.heroOverlay} />
             <div style={S.heroCenter}>
