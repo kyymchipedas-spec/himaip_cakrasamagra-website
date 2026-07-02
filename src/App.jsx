@@ -384,9 +384,9 @@ export default function App() {
             <div style={S.footerSub}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
           </div>
           <div style={S.footerSocials}>
-            <a href="https://instagram.com/hima_ip_stisiptasik" style={S.socialLink}>Instagram</a>
-            <a href="https://tiktok.com/@hima_ip_stisiptasik" style={S.socialLink}>TikTok / X</a>
-            <a href="mailto:himaipstisiptasik@gmail.com" style={S.socialLink}>Email</a>
+            <a href="https://instagram.com/hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>Instagram</a>
+            <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok / X</a>
+            <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>Email</a>
           </div>
         </div>
         <div style={S.footerBottom}>© 2026 HIMA IP Cakra Samagra — STISIP Tasikmalaya</div>
