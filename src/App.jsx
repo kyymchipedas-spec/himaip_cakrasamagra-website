@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 
 const ADMIN_CODE = "himaip2026";
-const SOSMED = {
-  instagram: "https://instagram.com/hima_ip_stisiptasik",
-  tiktok: "https://tiktok.com/@hima_ip_stisiptasik",
-  email: "mailto:himaipstisiptasik@gmail.com",
-};
+
 function storeGet(key) {
   try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
   catch(e) { return null; }
@@ -388,9 +384,9 @@ export default function App() {
             <div style={S.footerSub}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
           </div>
           <div style={S.footerSocials}>
-            <a href="#" style={S.socialLink}>Instagram</a>
-            <a href="#" style={S.socialLink}>Twitter / X</a>
-            <a href="#" style={S.socialLink}>YouTube</a>
+            <a href="https://instagram.com/hima_ip_stisiptasik" style={S.socialLink}>Instagram</a>
+            <a href="https://tiktok.com/@hima_ip_stisiptasik" style={S.socialLink}>TikTok / X</a>
+            <a href="mailto:himaipstisiptasik@gmail.com" style={S.socialLink}>Email</a>
           </div>
         </div>
         <div style={S.footerBottom}>© 2026 HIMA IP Cakra Samagra — STISIP Tasikmalaya</div>
