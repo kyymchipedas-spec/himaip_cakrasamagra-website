@@ -450,10 +450,10 @@ export default function App() {
                     {isAdmin && (
                       <>
                         <div style={{position:"absolute",top:6,left:6,display:"flex",gap:3}}>
-                          <button title="Pindah ke kiri/atas" style={{...S.photoDeleteBtn,background:"rgba(27,42,69,0.85)",width:24,height:24,fontSize:12}} onClick={() => movePhoto(activeEvent,p.id,"up")}>◀</button>
-                          <button title="Pindah ke kanan/bawah" style={{...S.photoDeleteBtn,background:"rgba(27,42,69,0.85)",width:24,height:24,fontSize:12}} onClick={() => movePhoto(activeEvent,p.id,"down")}>▶</button>
+                          <button title="Pindah ke kiri/atas" style={{position:"static",background:"rgba(27,42,69,0.85)",color:C.white,border:"none",borderRadius:4,width:24,height:24,fontSize:12,cursor:"pointer"}} onClick={() => movePhoto(activeEvent,p.id,"up")}>◀</button>
+                          <button title="Pindah ke kanan/bawah" style={{position:"static",background:"rgba(27,42,69,0.85)",color:C.white,border:"none",borderRadius:4,width:24,height:24,fontSize:12,cursor:"pointer"}} onClick={() => movePhoto(activeEvent,p.id,"down")}>▶</button>
                         </div>
-                        <button title="Hapus foto" style={{...S.photoDeleteBtn,position:"absolute",top:6,right:6}} onClick={() => deletePhoto(activeEvent,p.id)}>✕</button>
+                        <button title="Hapus foto" style={S.photoDeleteBtn} onClick={() => deletePhoto(activeEvent,p.id)}>✕</button>
                       </>
                     )}
                   </div>
