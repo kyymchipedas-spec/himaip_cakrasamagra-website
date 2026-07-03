@@ -26,12 +26,12 @@ const db = {
     });
   },
   async update(table, id, data) {
-    await fetch('${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}', {
-      method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    });
-  }
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+}
 };
 
 function compressImage(file, maxW = 800, quality = 0.65) {
