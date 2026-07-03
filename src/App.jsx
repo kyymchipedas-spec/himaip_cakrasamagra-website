@@ -24,6 +24,13 @@ const db = {
       method: "DELETE",
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
     });
+  },
+  async update(table, id, data) {
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
   }
 };
 
@@ -80,6 +87,8 @@ export default function App() {
   const [newEventDesc, setNewEventDesc] = useState("");
   const [lpjTitle, setLpjTitle] = useState("");
   const [newMember, setNewMember] = useState({ name: "", npm: "", jabatan: "", semester: "", photo: "" });
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editingMember, setEditingMember] = useState(null);
   const photoInputRef = useRef(null);
   const lpjFileInputRef = useRef(null);
   const memberPhotoRef = useRef(null);
@@ -175,6 +184,23 @@ export default function App() {
     await db.delete("members", id);
     setMembers(m => m.filter(x => x.id !== id));
   }
+  async function saveEditEvent(id, data) {
+    await db.update("events", id, data);
+    setEvents(e => e.map(x => x.id === id ? { ...x, ...data } : x));
+    setEditingEvent(null);
+  }
+  async function saveEditMember(id, data) {
+    await db.update("members", id, data);
+    setMembers(m => m.map(x => x.id === id ? { ...x, ...data } : x));
+    setEditingMember(null);
+  }
+  function movePhoto(eventId, photoId, direction) {
+    const photos = [...(photosByEvent[eventId] || [])];
+    const idx = photos.findIndex(p => p.id === photoId);
+    if (direction === "up" && idx > 0) [photos[idx-1], photos[idx]] = [photos[idx], photos[idx-1]];
+    else if (direction === "down" && idx < photos.length - 1) [photos[idx], photos[idx+1]] = [photos[idx+1], photos[idx]];
+    setPhotosByEvent(p => ({ ...p, [eventId]: photos }));
+  }
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
 
@@ -248,6 +274,35 @@ export default function App() {
         </div>
       )}
 
+      {editingEvent && (
+        <div style={S.modalOverlay} onClick={() => setEditingEvent(null)}>
+          <div style={{...S.modalBox,textAlign:"left"}} onClick={e => e.stopPropagation()}>
+            <div style={{...S.modalTitle,textAlign:"center"}}>Edit Kegiatan</div>
+            <input style={{...S.input,marginBottom:10}} placeholder="Nama kegiatan" defaultValue={editingEvent.name} onChange={e => setEditingEvent(ev => ({...ev,name:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} type="date" defaultValue={editingEvent.date} onChange={e => setEditingEvent(ev => ({...ev,date:e.target.value}))} />
+            <textarea style={{...S.input,minHeight:60,resize:"vertical",marginBottom:14}} placeholder="Deskripsi" defaultValue={editingEvent.description} onChange={e => setEditingEvent(ev => ({...ev,description:e.target.value}))} />
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button style={S.primaryBtn} onClick={() => saveEditEvent(editingEvent.id,{name:editingEvent.name,date:editingEvent.date,description:editingEvent.description})}>Simpan</button>
+              <button style={S.ghostBtn} onClick={() => setEditingEvent(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {editingMember && (
+        <div style={S.modalOverlay} onClick={() => setEditingMember(null)}>
+          <div style={{...S.modalBox,textAlign:"left"}} onClick={e => e.stopPropagation()}>
+            <div style={{...S.modalTitle,textAlign:"center"}}>Edit Anggota</div>
+            <input style={{...S.input,marginBottom:10}} placeholder="Nama" defaultValue={editingMember.name} onChange={e => setEditingMember(m => ({...m,name:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} placeholder="NPM" defaultValue={editingMember.npm} onChange={e => setEditingMember(m => ({...m,npm:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} placeholder="Jabatan" defaultValue={editingMember.jabatan} onChange={e => setEditingMember(m => ({...m,jabatan:e.target.value}))} />
+            <input style={{...S.input,marginBottom:14}} placeholder="Semester" defaultValue={editingMember.semester} onChange={e => setEditingMember(m => ({...m,semester:e.target.value}))} />
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button style={S.primaryBtn} onClick={() => saveEditMember(editingMember.id,{name:editingMember.name,npm:editingMember.npm,jabatan:editingMember.jabatan,semester:editingMember.semester})}>Simpan</button>
+              <button style={S.ghostBtn} onClick={() => setEditingMember(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
       {lightbox && (
         <div style={S.lightboxOverlay} onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="" style={S.lightboxImg} onClick={e => e.stopPropagation()} />
@@ -345,7 +400,7 @@ export default function App() {
                         <div style={S.eventCardBody}>
                           <div style={S.eventCardName}>{ev.name}</div>
                           {ev.date && <div style={S.eventCardDate}>{formatDate(ev.date)}</div>}
-                          {isAdmin && <button style={S.deleteLink} onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }}>Hapus</button>}
+                          {isAdmin && <div style={{display:"flex",gap:10}}><button style={S.deleteLink} onClick={e => {e.stopPropagation();setEditingEvent(ev);}}>Edit</button><button style={S.deleteLink} onClick={e => {e.stopPropagation();deleteEvent(ev.id);}}>Hapus</button></div>}
                         </div>
                       </div>
                     );
@@ -377,7 +432,7 @@ export default function App() {
                 {photos.map(p => (
                   <div key={p.id} style={S.photoTile}>
                     <img src={p.src} alt="" style={S.photoImg} onClick={() => setLightbox(p.src)} />
-                    {isAdmin && <button style={S.photoDeleteBtn} onClick={() => deletePhoto(activeEvent, p.id)}>✕</button>}
+                    {isAdmin && <div style={{position:"absolute",top:6,right:6,display:"flex",flexDirection:"column",gap:3}}><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => movePhoto(activeEvent,p.id,"up")}>▲</button><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => movePhoto(activeEvent,p.id,"down")}>▼</button><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => deletePhoto(activeEvent,p.id)}>✕</button></div>}
                   </div>
                 ))}
               </div>
@@ -419,7 +474,7 @@ export default function App() {
                   <div style={S.memberRow}><span style={S.memberLabel}>NPM</span><span>{m.npm||"-"}</span></div>
                   <div style={S.memberRow}><span style={S.memberLabel}>Jabatan</span><span>{m.jabatan||"-"}</span></div>
                   <div style={S.memberRow}><span style={S.memberLabel}>Semester</span><span>{m.semester||"-"}</span></div>
-                  {isAdmin && <button style={S.deleteLink} onClick={() => deleteMember(m.id)}>Hapus</button>}
+                  {isAdmin && <div style={{display:"flex",gap:10,marginTop:8}}><button style={S.deleteLink} onClick={() => setEditingMember(m)}>Edit</button><button style={S.deleteLink} onClick={() => deleteMember(m.id)}>Hapus</button></div>}
                 </div>
               ))}
             </div>
@@ -540,7 +595,7 @@ const S = {
   kabinetName:{fontFamily:"Georgia,serif",fontSize:"clamp(24px,4vw,38px)",fontWeight:700,color:C.navy,letterSpacing:2},
   kabinetPeriode:{fontFamily:"Georgia,serif",fontSize:20,fontStyle:"italic",color:C.muted,marginTop:4},
   kabinetQuote:{fontSize:15,lineHeight:1.8,color:C.muted,maxWidth:560,margin:"0 auto 40px",fontStyle:"italic"},
-  statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:"#e0d8c8",margin:0 -40px"},
+  statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:"#e0d8c8",margin:0 -40px},
   statCard:{padding:"28px 20px",textAlign:"center",background:C.white},
   statNum:{fontFamily:"Georgia,serif",fontSize:36,fontWeight:700,color:C.gold,lineHeight:1},
   statLabel:{marginTop:6,fontSize:11,color:C.muted,letterSpacing:1,textTransform:"uppercase"},
