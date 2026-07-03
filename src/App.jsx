@@ -285,7 +285,6 @@ export default function App() {
               <div style={S.statSection}>
                 <StatCard num={events.length} label="Kegiatan" />
                 <StatCard num={totalPhotos} label="Foto" />
-                <StatCard num={lpjDocs.length} label="Berkas LPJ" />
                 <StatCard num={members.length} label="Anggota" />
               </div>
             </div>
