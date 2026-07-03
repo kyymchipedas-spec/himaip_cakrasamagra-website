@@ -145,8 +145,9 @@ export default function App() {
     for (const file of Array.from(fileList)) {
       try {
         const src = await compressImage(file);
-        const photo = { id: "p_" + Date.now() + Math.random().toString(36).slice(2,6), event_id: eventId, src, caption: "" };
-        await db.insert("photos", photo);
+        const payload = { id: "p_" + Date.now() + Math.random().toString(36).slice(2,6), event_id: eventId, src, caption: "" };
+        const inserted = await db.insert("photos", payload);
+        const photo = Array.isArray(inserted) && inserted[0] ? inserted[0] : payload;
         setPhotosByEvent(p => ({ ...p, [eventId]: [photo, ...(p[eventId] || [])] }));
       } catch(e) { console.error(e); }
     }
@@ -194,12 +195,26 @@ export default function App() {
     setMembers(m => m.map(x => x.id === id ? { ...x, ...data } : x));
     setEditingMember(null);
   }
-  function movePhoto(eventId, photoId, direction) {
+  async function movePhoto(eventId, photoId, direction) {
     const photos = [...(photosByEvent[eventId] || [])];
     const idx = photos.findIndex(p => p.id === photoId);
-    if (direction === "up" && idx > 0) [photos[idx-1], photos[idx]] = [photos[idx], photos[idx-1]];
-    else if (direction === "down" && idx < photos.length - 1) [photos[idx], photos[idx+1]] = [photos[idx+1], photos[idx]];
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= photos.length) return;
+    const a = photos[idx], b = photos[swapIdx];
+    [photos[idx], photos[swapIdx]] = [photos[swapIdx], photos[idx]];
     setPhotosByEvent(p => ({ ...p, [eventId]: photos }));
+    try {
+      if (a.created_at && b.created_at) {
+        await Promise.all([
+          db.update("photos", a.id, { created_at: b.created_at }),
+          db.update("photos", b.id, { created_at: a.created_at })
+        ]);
+        setPhotosByEvent(p => ({
+          ...p,
+          [eventId]: p[eventId].map(x => x.id === a.id ? { ...x, created_at: b.created_at } : x.id === b.id ? { ...x, created_at: a.created_at } : x)
+        }));
+      }
+    } catch(e) { console.error(e); }
   }
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
@@ -432,7 +447,15 @@ export default function App() {
                 {photos.map(p => (
                   <div key={p.id} style={S.photoTile}>
                     <img src={p.src} alt="" style={S.photoImg} onClick={() => setLightbox(p.src)} />
-                    {isAdmin && <div style={{position:"absolute",top:6,right:6,display:"flex",flexDirection:"column",gap:3}}><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => movePhoto(activeEvent,p.id,"up")}>▲</button><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => movePhoto(activeEvent,p.id,"down")}>▼</button><button style={{...S.photoDeleteBtn,width:22,height:22,fontSize:10}} onClick={() => deletePhoto(activeEvent,p.id)}>✕</button></div>}
+                    {isAdmin && (
+                      <>
+                        <div style={{position:"absolute",top:6,left:6,display:"flex",gap:3}}>
+                          <button title="Pindah ke kiri/atas" style={{...S.photoDeleteBtn,background:"rgba(27,42,69,0.85)",width:24,height:24,fontSize:12}} onClick={() => movePhoto(activeEvent,p.id,"up")}>◀</button>
+                          <button title="Pindah ke kanan/bawah" style={{...S.photoDeleteBtn,background:"rgba(27,42,69,0.85)",width:24,height:24,fontSize:12}} onClick={() => movePhoto(activeEvent,p.id,"down")}>▶</button>
+                        </div>
+                        <button title="Hapus foto" style={{...S.photoDeleteBtn,position:"absolute",top:6,right:6}} onClick={() => deletePhoto(activeEvent,p.id)}>✕</button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
