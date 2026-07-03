@@ -376,8 +376,8 @@ export default function App() {
                     <img src="/logo-kabinet.png" alt="Logo" style={S.maknaLogoImg} onError={e => e.target.style.display="none"} />
                   </div>
                   <div style={S.maknaLogoText}>
-                    <p style={S.visiText}>Logo <strong style={{color:C.gold}}>Cakra Samagra</strong> menggambarkan roda (cakra) yang berputar selaras — melambangkan pergerakan bersama seluruh elemen mahasiswa Ilmu Pemerintahan yang saling bersinergi demi kemajuan organisasi dan almamater.</p>
-                    <p style={{...S.visiText,marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> mencerminkan kemuliaan, integritas, dan semangat berkarya. Simbol roda mewakili gerak yang tak pernah berhenti — terus melangkah, terus berdampak.</p>
+                    <p style={S.visiText}>Logo <strong style={{color:C.gold}}>Cakra Samagra</strong> merupakan representasi dari pusaran air (cakram) yang berputar menuju titik inti di bagian tengah sebagai simbol organisasi. Titik pusat menggambarkan HIMA IP sebagai inti yang menjadi pusat pergerakan, dikelilingi oleh pusaran yang mencerminkan dinamika organisasi. Lima pilar yang mengelilingi titik pusat melambangkan lima misi organisasi yang menjadi penopang sekaligus penjaga arah pergerakan HIMA IP. Garis lengkung pada bagian luar melambangkan pelindung yang membentuk pusaran terkuat, menggambarkan kekuatan dan kesatuan dalam menjaga keberlangsungan organisasi.</p>
+                    <p style={{...S.visiText,marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> pada logo melambangkan kemewahan, kekayaan, dan kemakmuran. Warna ini juga menjadi simbol kekuasaan yang mencerminkan kehormatan, kewibawaan, serta harapan agar HIMA IP mampu terus berkembang sebagai organisasi yang kuat, bermartabat, dan berpengaruh dalam menjalankan visi dan misinya.</p>
                   </div>
                 </div>
               </div>
