@@ -1,16 +1,33 @@
 import React, { useState, useEffect, useRef } from "react";
 
+const SUPABASE_URL = "https://vwhfzqbpqrxonswzjbft.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3aGZ6cWJwcXJ4b25zd3pqYmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MTg4ODAsImV4cCI6MjA5ODQ5NDg4MH0.gyWUpVWyTaQL5Tr3lR5N1YxfjEak2IKci4pwkMPnBtM";
 const ADMIN_CODE = "himaip2026";
 
-function storeGet(key) {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
-  catch(e) { return null; }
-}
-function storeSet(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-  catch(e) { alert("Penyimpanan penuh. Hapus beberapa foto lama."); return false; }
-}
-function compressImage(file, maxW = 1000, quality = 0.72) {
+const db = {
+  async get(table, query = "") {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?order=created_at.desc${query}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+    return res.json();
+  },
+  async insert(table, data) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  async delete(table, id) {
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+  }
+};
+
+function compressImage(file, maxW = 800, quality = 0.65) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -47,13 +64,14 @@ export default function App() {
   const [photosByEvent, setPhotosByEvent] = useState({});
   const [lpjDocs, setLpjDocs] = useState([]);
   const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [activeEvent, setActiveEvent] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -67,106 +85,115 @@ export default function App() {
   const memberPhotoRef = useRef(null);
   const contentRef = useRef(null);
 
-  useEffect(() => {
-    const evs = storeGet("events:list") || [];
-    setEvents(evs);
-    const photoMap = {};
-    for (const ev of evs) photoMap[ev.id] = storeGet(`photos:${ev.id}`) || [];
-    setPhotosByEvent(photoMap);
-    setLpjDocs(storeGet("lpj:list") || []);
-    setMembers(storeGet("members:list") || []);
-  }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    setLoading(true);
+    try {
+      const evs = await db.get("events");
+      setEvents(Array.isArray(evs) ? evs : []);
+      const photoMap = {};
+      if (Array.isArray(evs)) {
+        const allPhotos = await db.get("photos");
+        if (Array.isArray(allPhotos)) {
+          for (const p of allPhotos) {
+            if (!photoMap[p.event_id]) photoMap[p.event_id] = [];
+            photoMap[p.event_id].push(p);
+          }
+        }
+      }
+      setPhotosByEvent(photoMap);
+      const lpj = await db.get("lpj_docs");
+      setLpjDocs(Array.isArray(lpj) ? lpj : []);
+      const mem = await db.get("members", "&order=created_at.asc");
+      setMembers(Array.isArray(mem) ? mem : []);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  }
 
   function tryLogin() {
-    if (codeInput === ADMIN_CODE) {
-      setIsAdmin(true); setShowLogin(false); setCodeInput(""); setLoginError("");
-      setShowWelcome(true);
-    } else setLoginError("Kode salah. Coba lagi.");
-  }
-  function handleAdminBtn() {
-    if (isAdmin) setShowLogoutConfirm(true);
-    else setShowLogin(true);
-  }
-  function confirmLogout() {
-    setIsAdmin(false); setShowLogoutConfirm(false);
+    if (codeInput === ADMIN_CODE) { setIsAdmin(true); setShowLogin(false); setCodeInput(""); setLoginError(""); setShowWelcome(true); }
+    else setLoginError("Kode salah. Coba lagi.");
   }
   function navigate(t) { setTab(t); setMenuOpen(false); setActiveEvent(null); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function scrollToContent() { contentRef.current?.scrollIntoView({ behavior: "smooth" }); }
 
-  function addEvent() {
+  async function addEvent() {
     if (!newEventName.trim()) return;
-    const ev = { id: "ev_" + Date.now(), name: newEventName.trim(), date: newEventDate || "", desc: newEventDesc.trim() };
-    const updated = [ev, ...events];
-    setEvents(updated); setPhotosByEvent(p => ({ ...p, [ev.id]: [] }));
+    const ev = { id: "ev_" + Date.now(), name: newEventName.trim(), date: newEventDate || "", description: newEventDesc.trim() };
+    await db.insert("events", ev);
+    setEvents(e => [ev, ...e]);
     setNewEventName(""); setNewEventDate(""); setNewEventDesc("");
-    storeSet("events:list", updated);
   }
-  function deleteEvent(id) {
+  async function deleteEvent(id) {
     if (!confirm("Hapus kegiatan ini?")) return;
-    const updated = events.filter(e => e.id !== id);
-    setEvents(updated); storeSet("events:list", updated);
-    localStorage.removeItem(`photos:${id}`);
+    await db.delete("events", id);
+    setEvents(e => e.filter(x => x.id !== id));
     if (activeEvent === id) setActiveEvent(null);
   }
   async function uploadPhotos(eventId, fileList) {
     setBusy(true);
-    const newPhotos = [];
     for (const file of Array.from(fileList)) {
-      try { newPhotos.push({ id: "p_" + Date.now() + Math.random().toString(36).slice(2,7), src: await compressImage(file), caption: "" }); }
-      catch(e) {}
+      try {
+        const src = await compressImage(file);
+        const photo = { id: "p_" + Date.now() + Math.random().toString(36).slice(2,6), event_id: eventId, src, caption: "" };
+        await db.insert("photos", photo);
+        setPhotosByEvent(p => ({ ...p, [eventId]: [photo, ...(p[eventId] || [])] }));
+      } catch(e) { console.error(e); }
     }
-    const updated = [...newPhotos, ...(photosByEvent[eventId] || [])];
-    setPhotosByEvent(p => ({ ...p, [eventId]: updated }));
-    storeSet(`photos:${eventId}`, updated); setBusy(false);
+    setBusy(false);
   }
-  function deletePhoto(eventId, photoId) {
-    const updated = (photosByEvent[eventId] || []).filter(p => p.id !== photoId);
-    setPhotosByEvent(p => ({ ...p, [eventId]: updated }));
-    storeSet(`photos:${eventId}`, updated);
+  async function deletePhoto(eventId, photoId) {
+    await db.delete("photos", photoId);
+    setPhotosByEvent(p => ({ ...p, [eventId]: (p[eventId] || []).filter(x => x.id !== photoId) }));
   }
   async function uploadLpjFiles(fileList) {
     setBusy(true);
-    const additions = [];
     for (const file of Array.from(fileList)) {
       try {
         const isImage = file.type.startsWith("image/");
-        additions.push({ id: "d_" + Date.now() + Math.random().toString(36).slice(2,7), title: lpjTitle.trim() || file.name, name: file.name, type: file.type, isImage, dataUrl: isImage ? await compressImage(file, 1400, 0.78) : await fileToDataUrl(file), date: new Date().toISOString().slice(0,10) });
-      } catch(e) {}
+        const data_url = isImage ? await compressImage(file, 1000, 0.7) : await fileToDataUrl(file);
+        const doc = { id: "d_" + Date.now() + Math.random().toString(36).slice(2,6), title: lpjTitle.trim() || file.name, name: file.name, type: file.type, is_image: isImage, data_url, date: new Date().toISOString().slice(0,10) };
+        await db.insert("lpj_docs", doc);
+        setLpjDocs(d => [doc, ...d]);
+      } catch(e) { console.error(e); }
     }
-    const updated = [...additions, ...lpjDocs];
-    setLpjDocs(updated); storeSet("lpj:list", updated); setLpjTitle(""); setBusy(false);
+    setLpjTitle(""); setBusy(false);
   }
-  function deleteLpjDoc(id) { const u = lpjDocs.filter(d => d.id !== id); setLpjDocs(u); storeSet("lpj:list", u); }
-  function addMember() {
+  async function deleteLpjDoc(id) {
+    await db.delete("lpj_docs", id);
+    setLpjDocs(d => d.filter(x => x.id !== id));
+  }
+  async function addMember() {
     if (!newMember.name.trim()) return;
     const m = { id: "m_" + Date.now(), ...newMember };
-    const updated = [...members, m];
-    setMembers(updated); storeSet("members:list", updated);
+    await db.insert("members", m);
+    setMembers(mem => [...mem, m]);
     setNewMember({ name: "", npm: "", jabatan: "", semester: "", photo: "" });
   }
-  function deleteMember(id) { const u = members.filter(m => m.id !== id); setMembers(u); storeSet("members:list", u); }
+  async function deleteMember(id) {
+    await db.delete("members", id);
+    setMembers(m => m.filter(x => x.id !== id));
+  }
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
 
   return (
     <div style={S.page}>
-      {/* HEADER */}
       <header style={S.header}>
         <div style={S.headerLeft}>
           <button style={S.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
             <span style={S.bar}/><span style={S.bar}/><span style={S.bar}/>
           </button>
-          <button style={S.adminBtnHeader} onClick={handleAdminBtn}>
+          <button style={S.adminBtnHeader} onClick={() => isAdmin ? setShowLogoutConfirm(true) : setShowLogin(true)}>
             {isAdmin ? "Keluar Admin" : "Masuk Admin"}
           </button>
         </div>
-        {/* #1 — klik judul kembali ke beranda */}
         <div style={{...S.headerTitle, cursor:"pointer"}} onClick={() => navigate("beranda")}>
           WEBSITE ARSIP HIMA IP
         </div>
       </header>
 
-      {/* DRAWER MENU */}
       {menuOpen && (
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
@@ -178,7 +205,6 @@ export default function App() {
         </div>
       )}
 
-      {/* LOGIN MODAL */}
       {showLogin && (
         <div style={S.modalOverlay} onClick={() => setShowLogin(false)}>
           <div style={S.modalBox} onClick={e => e.stopPropagation()}>
@@ -196,48 +222,38 @@ export default function App() {
         </div>
       )}
 
-      {/* #5 — WELCOME MODAL */}
       {showWelcome && (
         <div style={S.modalOverlay} onClick={() => setShowWelcome(false)}>
-          <div style={{...S.modalBox, textAlign:"center"}} onClick={e => e.stopPropagation()}>
-            <div style={{fontSize:52, marginBottom:10}}>🎉💥</div>
-            <div style={{fontFamily:"Georgia,serif", fontWeight:700, fontSize:20, color:C.navy, marginBottom:10, letterSpacing:0.5}}>
-              SELAMAT!
-            </div>
-            <div style={{fontFamily:"'Inter',sans-serif", fontWeight:700, fontSize:15, color:C.red, letterSpacing:1, marginBottom:16}}>
-              ANDA SEKARANG MEMILIKI AKSES ADMIN
-            </div>
-            <p style={{fontSize:13, color:C.muted, marginBottom:20}}>Kamu bisa menambah kegiatan, upload foto, dan kelola LPJ sekarang.</p>
+          <div style={{...S.modalBox,textAlign:"center"}} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:52,marginBottom:10}}>🎉💥</div>
+            <div style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:20,color:C.navy,marginBottom:10}}>SELAMAT!</div>
+            <div style={{fontWeight:700,fontSize:14,color:C.red,letterSpacing:1,marginBottom:16}}>ANDA SEKARANG MEMILIKI AKSES ADMIN</div>
+            <p style={{fontSize:13,color:C.muted,marginBottom:20}}>Kamu bisa menambah kegiatan, upload foto, dan kelola LPJ sekarang.</p>
             <button onClick={() => setShowWelcome(false)} style={S.primaryBtn}>Siap! 🚀</button>
           </div>
         </div>
       )}
 
-      {/* #5 — LOGOUT CONFIRM MODAL */}
       {showLogoutConfirm && (
         <div style={S.modalOverlay} onClick={() => setShowLogoutConfirm(false)}>
-          <div style={{...S.modalBox, textAlign:"center"}} onClick={e => e.stopPropagation()}>
-            <div style={{fontSize:44, marginBottom:10}}>🤔</div>
-            <div style={{fontFamily:"Georgia,serif", fontWeight:700, fontSize:18, color:C.navy, marginBottom:12}}>
-              APA ANDA YAKIN INGIN KELUAR DARI MODE ADMIN?
-            </div>
-            <p style={{fontSize:13, color:C.muted, marginBottom:20}}>Setelah keluar, kamu tidak bisa upload atau hapus konten sampai masuk lagi.</p>
+          <div style={{...S.modalBox,textAlign:"center"}} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:44,marginBottom:10}}>🤔</div>
+            <div style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:18,color:C.navy,marginBottom:12}}>APA ANDA YAKIN INGIN KELUAR DARI MODE ADMIN?</div>
+            <p style={{fontSize:13,color:C.muted,marginBottom:20}}>Setelah keluar, kamu tidak bisa upload atau hapus konten sampai masuk lagi.</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={confirmLogout} style={S.primaryBtn}>Ya, Keluar</button>
+              <button onClick={() => { setIsAdmin(false); setShowLogoutConfirm(false); }} style={S.primaryBtn}>Ya, Keluar</button>
               <button onClick={() => setShowLogoutConfirm(false)} style={S.ghostBtn}>Batal</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* LIGHTBOX */}
       {lightbox && (
         <div style={S.lightboxOverlay} onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="" style={S.lightboxImg} onClick={e => e.stopPropagation()} />
         </div>
       )}
 
-      {/* BERANDA */}
       {tab === "beranda" && (
         <>
           <div style={S.hero}>
@@ -251,9 +267,7 @@ export default function App() {
               <button style={S.discoverBtn} onClick={scrollToContent}>What about ↓</button>
             </div>
           </div>
-
           <div ref={contentRef}>
-            {/* Logo Kabinet */}
             <div style={S.kabinetSection}>
               <div style={S.kabinetEyebrow}>HIMPUNAN MAHASISWA ILMU PEMERINTAHAN</div>
               <div style={S.kabinetLogoRow}>
@@ -268,8 +282,6 @@ export default function App() {
                 melangkah bersama, menyatukan bangsa dalam panduan."<br/>
                 <em>Bersama Almamater, berkarya untuk bangsa.</em>
               </div>
-
-              {/* #4 — Stat cards dipindah ke sini, antara kabinet dan visi */}
               <div style={S.statSection}>
                 <StatCard num={events.length} label="Kegiatan" />
                 <StatCard num={totalPhotos} label="Foto" />
@@ -277,13 +289,10 @@ export default function App() {
                 <StatCard num={members.length} label="Anggota" />
               </div>
             </div>
-
-            {/* Visi Misi & Makna Logo */}
             <div style={S.visiSection}>
               <div style={S.visiInner}>
                 <SectionHeader eyebrow="ORGANISASI" title="Visi" light />
                 <p style={S.visiText}>Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspiratif, advokasi, serta membangun kerjasama berkoordinatif dengan organisasi intra dan ekstra dan menjadikan organisasi katalisator untuk kepentingan seluruh mahasiswa dilingkungan prodi Ilmu Pemerintahan.</p>
-
                 <SectionHeader eyebrow="ORGANISASI" title="Misi" light />
                 <ul style={S.misiList}>
                   <li>Menjadikan Himpunan Mahasiswa Ilmu Pemerintahan sebagai wadah yang aspitarif dalam menampung, menyalurkan, dan memperjuangkan aspirasi seluruh mahasiswa Ilmu Pemerintahan.</li>
@@ -292,16 +301,14 @@ export default function App() {
                   <li>Menjadikan mahasiswa Ilmu Pemerintahan sebagai katalisator gerakan mahasiswa Ilmu Pemerintahan yang berorientasi pada kepentingan bersama dan kemajuan mahasiswa secara kolektif.</li>
                   <li>Mendorong terciptanya organisasi yang inklusif, partisipatif, dan responsif terhadap dinamika bersama.</li>
                 </ul>
-
-                {/* #3 — Makna logo dengan tampilan logo */}
                 <SectionHeader eyebrow="IDENTITAS" title="Makna Logo" light />
                 <div style={S.maknaLogoRow}>
                   <div style={S.maknaLogoImgWrap}>
-                    <img src="/logo-kabinet.png" alt="Logo Cakra Samagra" style={S.maknaLogoImg} onError={e => e.target.style.display="none"} />
+                    <img src="/logo-kabinet.png" alt="Logo" style={S.maknaLogoImg} onError={e => e.target.style.display="none"} />
                   </div>
                   <div style={S.maknaLogoText}>
                     <p style={S.visiText}>Logo <strong style={{color:C.gold}}>Cakra Samagra</strong> menggambarkan roda (cakra) yang berputar selaras — melambangkan pergerakan bersama seluruh elemen mahasiswa Ilmu Pemerintahan yang saling bersinergi demi kemajuan organisasi dan almamater.</p>
-                    <p style={{...S.visiText, marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> mencerminkan kemuliaan, integritas, dan semangat berkarya. Simbol roda mewakili gerak yang tak pernah berhenti — terus melangkah, terus berdampak.</p>
+                    <p style={{...S.visiText,marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> mencerminkan kemuliaan, integritas, dan semangat berkarya. Simbol roda mewakili gerak yang tak pernah berhenti — terus melangkah, terus berdampak.</p>
                   </div>
                 </div>
               </div>
@@ -310,79 +317,76 @@ export default function App() {
         </>
       )}
 
-      {/* GALERI LIST */}
       {tab === "galeri" && !activeEvent && (
         <main style={S.main}>
-          <SectionHeader eyebrow="ARSIP VISUAL" title="Galeri Kegiatan" />
-          {isAdmin && (
-            <div style={S.formCard}>
-              <div style={S.formCardTitle}>+ Tambah Kegiatan Baru</div>
-              <div style={S.formRow}>
-                <input style={S.input} placeholder="Nama kegiatan" value={newEventName} onChange={e => setNewEventName(e.target.value)} />
-                <input style={S.input} type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} />
-              </div>
-              <textarea style={{...S.input,marginTop:10,minHeight:60,resize:"vertical"}} placeholder="Deskripsi singkat (opsional)" value={newEventDesc} onChange={e => setNewEventDesc(e.target.value)} />
-              <button style={{...S.primaryBtn,marginTop:12}} onClick={addEvent}>Simpan Kegiatan</button>
-            </div>
-          )}
-          {events.length === 0 ? <div style={S.emptyState}>Belum ada kegiatan yang diarsipkan.</div> : (
-            <div style={S.eventGrid}>
-              {events.map(ev => {
-                const photos = photosByEvent[ev.id] || []; const cover = photos[0]?.src;
-                return (
-                  <div key={ev.id} style={S.eventCard} onClick={() => setActiveEvent(ev.id)}>
-                    <div style={S.eventCover}>
-                      {cover ? <img src={cover} alt={ev.name} style={S.eventCoverImg} /> : <div style={S.eventCoverEmpty}>Belum ada foto</div>}
-                      <div style={S.eventCoverBadge}>{photos.length} foto</div>
-                    </div>
-                    <div style={S.eventCardBody}>
-                      <div style={S.eventCardName}>{ev.name}</div>
-                      {ev.date && <div style={S.eventCardDate}>{formatDate(ev.date)}</div>}
-                      {isAdmin && <button style={S.deleteLink} onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }}>Hapus</button>}
-                    </div>
+          {loading ? <div style={S.emptyState}>Memuat data...</div> : (
+            <>
+              <SectionHeader eyebrow="ARSIP VISUAL" title="Galeri Kegiatan" />
+              {isAdmin && (
+                <div style={S.formCard}>
+                  <div style={S.formCardTitle}>+ Tambah Kegiatan Baru</div>
+                  <div style={S.formRow}>
+                    <input style={S.input} placeholder="Nama kegiatan" value={newEventName} onChange={e => setNewEventName(e.target.value)} />
+                    <input style={S.input} type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </main>
-      )}
-
-      {/* GALERI DETAIL */}
-      {tab === "galeri" && activeEvent && (
-        <main style={S.main}>
-          {(() => {
-            const event = events.find(e => e.id === activeEvent);
-            const photos = photosByEvent[activeEvent] || [];
-            if (!event) return null;
-            return (
-              <>
-                <button style={S.backBtn} onClick={() => setActiveEvent(null)}>← Kembali ke Galeri</button>
-                <SectionHeader eyebrow={event.date ? formatDate(event.date) : "KEGIATAN"} title={event.name} />
-                {event.desc && <p style={S.eventDesc}>{event.desc}</p>}
-                {isAdmin && (
-                  <div style={{marginBottom:26}}>
-                    <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e => e.target.files.length && uploadPhotos(activeEvent, e.target.files)} />
-                    <button style={S.primaryBtn} disabled={busy} onClick={() => photoInputRef.current.click()}>{busy ? "Mengunggah…" : "+ Unggah Foto"}</button>
-                  </div>
-                )}
-                {photos.length === 0 ? <div style={S.emptyState}>Belum ada foto.</div> : (
-                  <div style={S.photoGrid}>
-                    {photos.map(p => (
-                      <div key={p.id} style={S.photoTile}>
-                        <img src={p.src} alt="" style={S.photoImg} onClick={() => setLightbox(p.src)} />
-                        {isAdmin && <button style={S.photoDeleteBtn} onClick={() => deletePhoto(activeEvent, p.id)}>✕</button>}
+                  <textarea style={{...S.input,marginTop:10,minHeight:60,resize:"vertical"}} placeholder="Deskripsi singkat (opsional)" value={newEventDesc} onChange={e => setNewEventDesc(e.target.value)} />
+                  <button style={{...S.primaryBtn,marginTop:12}} onClick={addEvent}>Simpan Kegiatan</button>
+                </div>
+              )}
+              {events.length === 0 ? <div style={S.emptyState}>Belum ada kegiatan.</div> : (
+                <div style={S.eventGrid}>
+                  {events.map(ev => {
+                    const photos = photosByEvent[ev.id] || []; const cover = photos[0]?.src;
+                    return (
+                      <div key={ev.id} style={S.eventCard} onClick={() => setActiveEvent(ev.id)}>
+                        <div style={S.eventCover}>
+                          {cover ? <img src={cover} alt={ev.name} style={S.eventCoverImg} /> : <div style={S.eventCoverEmpty}>Belum ada foto</div>}
+                          <div style={S.eventCoverBadge}>{photos.length} foto</div>
+                        </div>
+                        <div style={S.eventCardBody}>
+                          <div style={S.eventCardName}>{ev.name}</div>
+                          {ev.date && <div style={S.eventCardDate}>{formatDate(ev.date)}</div>}
+                          {isAdmin && <button style={S.deleteLink} onClick={e => { e.stopPropagation(); deleteEvent(ev.id); }}>Hapus</button>}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            );
-          })()}
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </main>
       )}
 
-      {/* ANGGOTA */}
+      {tab === "galeri" && activeEvent && (() => {
+        const event = events.find(e => e.id === activeEvent);
+        const photos = photosByEvent[activeEvent] || [];
+        if (!event) return null;
+        return (
+          <main style={S.main}>
+            <button style={S.backBtn} onClick={() => setActiveEvent(null)}>← Kembali ke Galeri</button>
+            <SectionHeader eyebrow={event.date ? formatDate(event.date) : "KEGIATAN"} title={event.name} />
+            {event.description && <p style={S.eventDesc}>{event.description}</p>}
+            {isAdmin && (
+              <div style={{marginBottom:26}}>
+                <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e => e.target.files.length && uploadPhotos(activeEvent, e.target.files)} />
+                <button style={S.primaryBtn} disabled={busy} onClick={() => photoInputRef.current.click()}>{busy ? "Mengunggah…" : "+ Unggah Foto"}</button>
+              </div>
+            )}
+            {photos.length === 0 ? <div style={S.emptyState}>Belum ada foto.</div> : (
+              <div style={S.photoGrid}>
+                {photos.map(p => (
+                  <div key={p.id} style={S.photoTile}>
+                    <img src={p.src} alt="" style={S.photoImg} onClick={() => setLightbox(p.src)} />
+                    {isAdmin && <button style={S.photoDeleteBtn} onClick={() => deletePhoto(activeEvent, p.id)}>✕</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </main>
+        );
+      })()}
+
       {tab === "anggota" && (
         <main style={S.main}>
           <SectionHeader eyebrow="KEPENGURUSAN" title="Daftar Anggota" />
@@ -399,13 +403,13 @@ export default function App() {
               </div>
               <input ref={memberPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
                 const file = e.target.files[0]; if (!file) return;
-                const reader = new FileReader(); reader.onload = ev => setNewMember(m=>({...m,photo:ev.target.result})); reader.readAsDataURL(file);
+                compressImage(file, 400, 0.8).then(src => setNewMember(m=>({...m,photo:src})));
               }} />
               <button style={{...S.ghostBtn,marginTop:10}} onClick={() => memberPhotoRef.current.click()}>{newMember.photo ? "Foto dipilih ✓" : "Pilih Foto"}</button>
               <button style={{...S.primaryBtn,marginTop:12}} onClick={addMember}>Simpan Anggota</button>
             </div>
           )}
-          {members.length === 0 ? <div style={S.emptyState}>Belum ada anggota yang ditambahkan.</div> : (
+          {members.length === 0 ? <div style={S.emptyState}>Belum ada anggota.</div> : (
             <div style={S.memberGrid}>
               {members.map(m => (
                 <div key={m.id} style={S.memberCard}>
@@ -424,7 +428,6 @@ export default function App() {
         </main>
       )}
 
-      {/* LPJ */}
       {tab === "lpj" && (
         <main style={S.main}>
           <SectionHeader eyebrow="PERTANGGUNGJAWABAN" title="Laporan Pertanggungjawaban (LPJ)" />
@@ -440,12 +443,12 @@ export default function App() {
             <div style={S.docGrid}>
               {lpjDocs.map(d => (
                 <div key={d.id} style={S.docCard}>
-                  {d.isImage ? <img src={d.dataUrl} alt={d.title} style={S.docThumb} onClick={() => setLightbox(d.dataUrl)} /> : <div style={S.docIconWrap} onClick={() => window.open(d.dataUrl,"_blank")}><DocIcon /></div>}
+                  {d.is_image ? <img src={d.data_url} alt={d.title} style={S.docThumb} onClick={() => setLightbox(d.data_url)} /> : <div style={S.docIconWrap} onClick={() => window.open(d.data_url,"_blank")}><DocIcon /></div>}
                   <div style={S.docBody}>
                     <div style={S.docTitle}>{d.title}</div>
                     <div style={S.docMeta}>{d.name} · {formatDate(d.date)}</div>
                     <div style={{display:"flex",gap:10,marginTop:6}}>
-                      <a href={d.dataUrl} download={d.name} style={S.docLink}>Unduh</a>
+                      <a href={d.data_url} download={d.name} style={S.docLink}>Unduh</a>
                       {isAdmin && <button style={S.deleteLink} onClick={() => deleteLpjDoc(d.id)}>Hapus</button>}
                     </div>
                   </div>
@@ -456,7 +459,6 @@ export default function App() {
         </main>
       )}
 
-      {/* #2 — FOOTER dengan Follow Us + GMaps */}
       <footer style={S.footer}>
         <div style={S.footerTop}>
           <div style={S.footerBrand}>
@@ -464,24 +466,17 @@ export default function App() {
             <div style={S.footerSub}>Himpunan Mahasiswa Ilmu Pemerintahan STISIP Tasikmalaya · 2026–2027</div>
             <div style={{marginTop:16}}>
               <div style={S.footerSectionLabel}>📍 Lokasi Kampus</div>
-              <a
-                href="https://maps.google.com/?q=STISIP+Tasikmalaya"
-                target="_blank"
-                rel="noreferrer"
-                style={S.gmapsLink}
-              >
-                STISIP Tasikmalaya — Buka di Google Maps
-              </a>
+              <a href="https://maps.google.com/?q=STISIP+Tasikmalaya" target="_blank" rel="noreferrer" style={S.gmapsLink}>STISIP Tasikmalaya — Buka di Google Maps</a>
             </div>
           </div>
           <div>
-            <div style={S.footerSectionLabel}>FOLLOW US</div>
+            <div style={S.footerSectionLabel}>Follow Us</div>
             <div style={S.footerSocials}>
-              <a href="https://instagram.com/hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>Instagram</a>
+              <a href="https://instagram.com/hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>📸Instagram</a>
               <span style={S.socialSep}>|</span>
-              <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>TikTok</a>
+              <a href="https://tiktok.com/@hima_ip_stisiptasik" target="_blank" rel="noreferrer" style={S.socialLink}>🎵TikTok</a>
               <span style={S.socialSep}>|</span>
-              <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>Email</a>
+              <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>✉️Email</a>
             </div>
           </div>
         </div>
@@ -539,14 +534,13 @@ const S = {
   heroEyebrow:{fontFamily:"'Inter',sans-serif",fontSize:12,letterSpacing:4,color:C.gold,fontWeight:600,marginBottom:16,textTransform:"uppercase"},
   heroTitle:{fontFamily:"Georgia,serif",fontSize:"clamp(28px,5vw,56px)",fontWeight:700,color:C.white,lineHeight:1.2,margin:"0 0 32px"},
   discoverBtn:{background:"transparent",border:`2px solid ${C.white}`,color:C.white,fontSize:15,fontWeight:600,padding:"14px 36px",borderRadius:40,cursor:"pointer",letterSpacing:1,fontFamily:"'Inter',sans-serif"},
-  kabinetSection:{background:C.white,padding:"70px 40px 0",textAlign:"center",borderBottom:"1px solid #eee"},
+  kabinetSection:{background:C.white,padding:"70px 40px 0",textAlign:"center"},
   kabinetEyebrow:{fontSize:12,letterSpacing:3,color:C.gold,fontWeight:700,marginBottom:24,textTransform:"uppercase"},
   kabinetLogoRow:{display:"flex",alignItems:"center",justifyContent:"center",gap:24,marginBottom:24,flexWrap:"wrap"},
   kabinetLogo:{width:80,height:80,objectFit:"contain"},
   kabinetName:{fontFamily:"Georgia,serif",fontSize:"clamp(24px,4vw,38px)",fontWeight:700,color:C.navy,letterSpacing:2},
   kabinetPeriode:{fontFamily:"Georgia,serif",fontSize:20,fontStyle:"italic",color:C.muted,marginTop:4},
   kabinetQuote:{fontSize:15,lineHeight:1.8,color:C.muted,maxWidth:560,margin:"0 auto 40px",fontStyle:"italic"},
-  // #4 stat section — di dalam kabinet section
   statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:C.black,margin:"0 -40px"},
   statCard:{padding:"28px 20px",borderRight:`1px solid rgba(182,138,61,0.2)`,textAlign:"center"},
   statNum:{fontFamily:"Georgia,serif",fontSize:36,fontWeight:700,color:C.gold,lineHeight:1},
@@ -555,7 +549,6 @@ const S = {
   visiInner:{maxWidth:800,margin:"0 auto",padding:"0 40px"},
   visiText:{fontSize:15.5,lineHeight:1.75,color:"rgba(255,255,255,0.85)",marginBottom:24,marginTop:0},
   misiList:{paddingLeft:20,color:"rgba(255,255,255,0.85)",lineHeight:2,fontSize:15.5,marginBottom:40},
-  // #3 makna logo dengan foto
   maknaLogoRow:{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"},
   maknaLogoImgWrap:{flexShrink:0,width:160,height:160,background:"rgba(255,255,255,0.08)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid rgba(182,138,61,0.3)`},
   maknaLogoImg:{width:130,height:130,objectFit:"contain"},
@@ -579,7 +572,7 @@ const S = {
   photoImg:{width:"100%",height:180,objectFit:"cover",display:"block",cursor:"pointer"},
   photoDeleteBtn:{position:"absolute",top:6,right:6,background:"rgba(140,46,51,0.9)",color:C.white,border:"none",borderRadius:4,width:26,height:26,cursor:"pointer",fontSize:13},
   memberGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:20},
-  memberCard:{background:C.white,border:"1px solid #e0d8c8",borderRadius:8,padding:16,position:"relative"},
+  memberCard:{background:C.white,border:"1px solid #e0d8c8",borderRadius:8,padding:16},
   memberPhotoWrap:{width:"100%",height:160,background:"#f0ebe0",borderRadius:6,overflow:"hidden",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center"},
   memberPhoto:{width:"100%",height:"100%",objectFit:"cover"},
   memberPhotoEmpty:{fontSize:36,opacity:0.4},
@@ -606,14 +599,13 @@ const S = {
   errorText:{color:C.red,fontSize:13,marginTop:8},
   lightboxOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:600,padding:24,cursor:"zoom-out"},
   lightboxImg:{maxWidth:"100%",maxHeight:"100%",borderRadius:4},
-  // #2 footer
   footer:{background:C.black,borderTop:`2px solid ${C.gold}`,padding:"44px 40px 24px"},
   footerTop:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:32,marginBottom:30},
   footerBrand:{},
   footerTitle:{fontWeight:700,fontSize:15,color:C.gold,letterSpacing:1,marginBottom:6},
   footerSub:{fontSize:13,color:"rgba(255,255,255,0.6)"},
   footerSectionLabel:{fontSize:11,letterSpacing:2,color:C.gold,fontWeight:700,textTransform:"uppercase",marginBottom:12},
-  footerSocials:{display:"flex",flexDirection:"row",alignItem:"center",gap:12,flexWrap:"wrap"},
+  footerSocials:{display:"flex",flexDirection:"row",alignItems:"center",gap:12,flexWrap:"wrap"},
   socialLink:{color:"rgba(255,255,255,0.8)",fontSize:14,textDecoration:"none",fontWeight:500},
   socialSep:{color:"rgba(182,138,61,0.5)",fontSize:14},
   gmapsLink:{color:"rgba(255,255,255,0.7)",fontSize:13,textDecoration:"underline",display:"block",marginTop:6},
