@@ -578,7 +578,7 @@ const S = {
   adminBtnHeader:{background:C.red,color:C.white,border:"none",fontWeight:600,fontSize:13,padding:"7px 14px",borderRadius:4,cursor:"pointer",fontFamily:"'Inter',sans-serif"},
   drawerOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:200},
   drawer:{position:"absolute",left:0,top:0,bottom:0,width:260,background:C.black,borderRight:`2px solid ${C.gold}`,paddingTop:60},
-  drawerTitle:{fontFamily:"'Inter',sans-serif",fontWeight:700,fontSize:18,color:C.gold,padding:"0 24px 20px",borderBottom:`1px solid rgba(182,138,61,0.3)`,marginBottom:10},
+  drawerTitle:{fontFamily:"'Inter',sans-serif",fontWeight:700,fontSize:18,color:C.gold,padding:"0 24px 20px",borderBottom:"1px solid rgba(182,138,61,0.3)",marginBottom:10},
   drawerItem:{display:"block",width:"100%",background:"none",border:"none",color:C.white,fontSize:15,fontWeight:500,padding:"14px 24px",cursor:"pointer",textAlign:"left",fontFamily:"'Inter',sans-serif"},
   drawerItemActive:{color:C.gold,background:"rgba(182,138,61,0.1)"},
   hero:{position:"relative",height:"100vh",width:"100%",overflow:"hidden"},
@@ -595,7 +595,7 @@ const S = {
   kabinetName:{fontFamily:"Georgia,serif",fontSize:"clamp(24px,4vw,38px)",fontWeight:700,color:C.navy,letterSpacing:2},
   kabinetPeriode:{fontFamily:"Georgia,serif",fontSize:20,fontStyle:"italic",color:C.muted,marginTop:4},
   kabinetQuote:{fontSize:15,lineHeight:1.8,color:C.muted,maxWidth:560,margin:"0 auto 40px",fontStyle:"italic"},
-  statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:"#e0d8c8",margin:0 -40px},
+  statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:"#e0d8c8",margin:"0 -40px"},
   statCard:{padding:"28px 20px",textAlign:"center",background:C.white},
   statNum:{fontFamily:"Georgia,serif",fontSize:36,fontWeight:700,color:C.gold,lineHeight:1},
   statLabel:{marginTop:6,fontSize:11,color:C.muted,letterSpacing:1,textTransform:"uppercase"},
@@ -604,7 +604,7 @@ const S = {
   visiText:{fontSize:15.5,lineHeight:1.75,color:"rgba(255,255,255,0.85)",marginBottom:24,marginTop:0},
   misiList:{paddingLeft:20,color:"rgba(255,255,255,0.85)",lineHeight:2,fontSize:15.5,marginBottom:40},
   maknaLogoRow:{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"},
-  maknaLogoImgWrap:{flexShrink:0,width:160,height:160,background:"rgba(255,255,255,0.08)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid rgba(182,138,61,0.3)`},
+  maknaLogoImgWrap:{flexShrink:0,width:160,height:160,background:"rgba(255,255,255,0.08)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid rgba(182,138,61,0.3)"},
   maknaLogoImg:{width:130,height:130,objectFit:"contain"},
   maknaLogoText:{flex:1,minWidth:200},
   main:{maxWidth:1100,margin:"0 auto",padding:"90px 40px 80px"},
@@ -663,5 +663,5 @@ const S = {
   socialLink:{color:"rgba(255,255,255,0.8)",fontSize:14,textDecoration:"none",fontWeight:500},
   socialSep:{color:"rgba(182,138,61,0.5)",fontSize:14},
   gmapsLink:{color:"rgba(255,255,255,0.7)",fontSize:13,textDecoration:"underline",display:"block",marginTop:6},
-  footerBottom:{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:20,fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"},
+  footerBottom:{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:20,fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"}
 };
