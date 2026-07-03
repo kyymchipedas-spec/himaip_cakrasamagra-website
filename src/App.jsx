@@ -595,7 +595,7 @@ const S = {
   kabinetName:{fontFamily:"Georgia,serif",fontSize:"clamp(24px,4vw,38px)",fontWeight:700,color:C.navy,letterSpacing:2},
   kabinetPeriode:{fontFamily:"Georgia,serif",fontSize:20,fontStyle:"italic",color:C.muted,marginTop:4},
   kabinetQuote:{fontSize:15,lineHeight:1.8,color:C.muted,maxWidth:560,margin:"0 auto 40px",fontStyle:"italic"},
-  statSection:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",background:"#e0d8c8",margin:"0 -40px"},
+  statSection:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:C.black,margin:"0 -40px"},
   statCard:{padding:"28px 20px",textAlign:"center",background:C.white},
   statNum:{fontFamily:"Georgia,serif",fontSize:36,fontWeight:700,color:C.gold,lineHeight:1},
   statLabel:{marginTop:6,fontSize:11,color:C.muted,letterSpacing:1,textTransform:"uppercase"},
