@@ -400,7 +400,7 @@ export default function App() {
                         <div style={S.eventCardBody}>
                           <div style={S.eventCardName}>{ev.name}</div>
                           {ev.date && <div style={S.eventCardDate}>{formatDate(ev.date)}</div>}
-                          {isAdmin && <div style={display:"flex",gap:10}><button style={S.deleteLink} onClick={e => {e.stopPropagation();setEditingEvent(ev);}>Edit</button><button style={S.deleteLink} onClick={e => {e.stopPropagation();deleteEvent(ev.id);}>hapus</button></div>}
+                          {isAdmin && <div style={{display:"flex",gap:10}}><button style={S.deleteLink} onClick={e => {e.stopPropagation();setEditingEvent(ev);}}>Edit</button><button style={S.deleteLink} onClick={e => {e.stopPropagation();deleteEvent(ev.id);}}>Hapus</button></div>}
                         </div>
                       </div>
                     );
