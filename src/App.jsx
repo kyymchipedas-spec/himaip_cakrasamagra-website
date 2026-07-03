@@ -224,7 +224,7 @@ export default function App() {
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
             <div style={S.drawerTitle}>HIMA IP</div>
-            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["lpj","LPJ"]].map(([key,label]) => (
+            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["lpj","BERKAS"]].map(([key,label]) => (
               <button key={key} style={{...S.drawerItem,...(tab===key?S.drawerItemActive:{})}} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -482,7 +482,19 @@ export default function App() {
         </main>
       )}
 
-      {tab === "lpj" && (
+      {tab === "lpj" && !isAdmin && (
+        <main style={S.main}>
+          <div style={{textAlign:"center",padding:"80px 20px"}}>
+            <div style={{fontSize:56,marginBottom:18}}>🔒</div>
+            <p style={{fontSize:15.5,lineHeight:1.8,color:C.muted,maxWidth:460,margin:"0 auto"}}>
+              Halaman ini hanya dapat diakses oleh Administrator yang memiliki otorisasi resmi.<br/>
+              Kamu menemukan pintunya, tetapi belum memiliki kuncinya🔑.
+            </p>
+          </div>
+        </main>
+      )}
+
+      {tab === "lpj" && isAdmin && (
         <main style={S.main}>
           <SectionHeader eyebrow="PERTANGGUNGJAWABAN" title="Laporan Pertanggungjawaban (LPJ)" />
           {isAdmin && (
