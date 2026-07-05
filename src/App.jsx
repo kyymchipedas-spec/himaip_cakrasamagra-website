@@ -275,6 +275,8 @@ export default function App() {
       <style>{`
         @keyframes pageFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .page-fade-wrap { animation: pageFadeIn 0.4s ease; }
+        .music-link { color:#1DB954; font-weight:600; text-decoration:none; cursor:pointer; max-width:190px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; transition:color 0.15s ease; }
+        .music-link:hover { color:#2FE271; text-decoration:underline; }
       `}</style>
       <header style={S.header}>
         <div style={S.headerLeft}>
@@ -537,8 +539,8 @@ export default function App() {
                 <input style={S.input} placeholder="Semester" value={newMember.semester} onChange={e => setNewMember(m=>({...m,semester:e.target.value}))} />
               </div>
               <div style={{...S.formRow,marginTop:10}}>
-                <input style={S.input} placeholder="Music Fav. (mis. Judul lagu - Penyanyi/Band)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
-                <input style={S.input} placeholder="Link lagu Spotify (wajib)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
+                <input style={S.input} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
+                <input style={S.input} placeholder="Link lagu Spotify (opsional)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
               </div>
               <input ref={memberPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
                 const file = e.target.files[0]; if (!file) return;
@@ -561,11 +563,11 @@ export default function App() {
                   <div style={S.memberRow}><span style={S.memberLabel}>Semester</span><span>{m.semester||"-"}</span></div>
                   {m.music_fav && (
                     <div style={S.memberRow}>
-                      <span style={{...S.memberLabel,color:"#fff",background:C.navy,padding:"1px 6px",borderRadius:3}}>Music Fav.</span>
+                      <span style={S.memberLabel}>🎵 Music Fav.</span>
                       {m.music_link ? (
-                        <a href={m.music_link} target="_blank" rel="noreferrer" style={{color:"#1DB954",fontWeight:600,textDecoration:"none"}}>{m.music_fav}</a>
+                        <a href={m.music_link} target="_blank" rel="noreferrer" className="music-link" title={`${m.music_fav} — 🎵 Buka di Spotify`}>{m.music_fav}</a>
                       ) : (
-                        <span style={{color:"#1DB954",fontWeight:600}}>{m.music_fav}</span>
+                        <span style={{color:"#1DB954",fontWeight:600,maxWidth:190,display:"inline-block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",verticalAlign:"bottom"}} title={m.music_fav}>{m.music_fav}</span>
                       )}
                     </div>
                   )}
