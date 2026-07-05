@@ -537,8 +537,8 @@ export default function App() {
                 <input style={S.input} placeholder="Semester" value={newMember.semester} onChange={e => setNewMember(m=>({...m,semester:e.target.value}))} />
               </div>
               <div style={{...S.formRow,marginTop:10}}>
-                <input style={S.input} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
-                <input style={S.input} placeholder="Link lagu Spotify (opsional)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
+                <input style={S.input} placeholder="Music Fav. (mis. Judul lagu - Penyanyi/Band)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
+                <input style={S.input} placeholder="Link lagu Spotify (wajib)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
               </div>
               <input ref={memberPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
                 const file = e.target.files[0]; if (!file) return;
