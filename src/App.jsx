@@ -89,12 +89,29 @@ export default function App() {
   const [newMember, setNewMember] = useState({ name: "", npm: "", jabatan: "", semester: "", photo: "" });
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
+  const [berkasFolders, setBerkasFolders] = useState([]);
+  const [activeFolder, setActiveFolder] = useState(null);
+  const [newFolderName, setNewFolderName] = useState("");
   const photoInputRef = useRef(null);
   const lpjFileInputRef = useRef(null);
   const memberPhotoRef = useRef(null);
   const contentRef = useRef(null);
 
   useEffect(() => { loadAll(); }, []);
+
+  // --- Navigasi history browser (supaya tombol kembali HP tidak langsung keluar dari web) ---
+  useEffect(() => {
+    window.history.replaceState({ tab: "beranda", activeEvent: null, activeFolder: null }, "");
+    function handlePopState(e) {
+      const st = e.state || { tab: "beranda", activeEvent: null, activeFolder: null };
+      setTab(st.tab || "beranda");
+      setActiveEvent(st.activeEvent || null);
+      setActiveFolder(st.activeFolder || null);
+      setMenuOpen(false);
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   async function loadAll() {
     setLoading(true);
@@ -114,6 +131,8 @@ export default function App() {
       setPhotosByEvent(photoMap);
       const lpj = await db.get("lpj_docs");
       setLpjDocs(Array.isArray(lpj) ? lpj : []);
+      const folders = await db.get("berkas_folders");
+      setBerkasFolders(Array.isArray(folders) ? folders : []);
       const mem = await db.get("members", "&order=created_at.asc");
       setMembers(Array.isArray(mem) ? mem : []);
     } catch(e) { console.error(e); }
@@ -124,7 +143,21 @@ export default function App() {
     if (codeInput === ADMIN_CODE) { setIsAdmin(true); setShowLogin(false); setCodeInput(""); setLoginError(""); setShowWelcome(true); }
     else setLoginError("Kode salah. Coba lagi.");
   }
-  function navigate(t) { setTab(t); setMenuOpen(false); setActiveEvent(null); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function navigate(t) {
+    setTab(t); setMenuOpen(false); setActiveEvent(null); setActiveFolder(null);
+    window.history.pushState({ tab: t, activeEvent: null, activeFolder: null }, "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function openEvent(id) {
+    setActiveEvent(id);
+    window.history.pushState({ tab: "galeri", activeEvent: id, activeFolder: null }, "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function openFolder(id) {
+    setActiveFolder(id);
+    window.history.pushState({ tab: "lpj", activeEvent: null, activeFolder: id }, "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   function scrollToContent() { contentRef.current?.scrollIntoView({ behavior: "smooth" }); }
 
   async function addEvent() {
@@ -157,13 +190,13 @@ export default function App() {
     await db.delete("photos", photoId);
     setPhotosByEvent(p => ({ ...p, [eventId]: (p[eventId] || []).filter(x => x.id !== photoId) }));
   }
-  async function uploadLpjFiles(fileList) {
+  async function uploadLpjFiles(folderId, fileList) {
     setBusy(true);
     for (const file of Array.from(fileList)) {
       try {
         const isImage = file.type.startsWith("image/");
         const data_url = isImage ? await compressImage(file, 1000, 0.7) : await fileToDataUrl(file);
-        const doc = { id: "d_" + Date.now() + Math.random().toString(36).slice(2,6), title: lpjTitle.trim() || file.name, name: file.name, type: file.type, is_image: isImage, data_url, date: new Date().toISOString().slice(0,10) };
+        const doc = { id: "d_" + Date.now() + Math.random().toString(36).slice(2,6), title: lpjTitle.trim() || file.name, name: file.name, type: file.type, is_image: isImage, data_url, date: new Date().toISOString().slice(0,10), folder_id: folderId };
         await db.insert("lpj_docs", doc);
         setLpjDocs(d => [doc, ...d]);
       } catch(e) { console.error(e); }
@@ -173,6 +206,22 @@ export default function App() {
   async function deleteLpjDoc(id) {
     await db.delete("lpj_docs", id);
     setLpjDocs(d => d.filter(x => x.id !== id));
+  }
+  async function addFolder() {
+    if (!newFolderName.trim()) return;
+    const f = { id: "f_" + Date.now(), name: newFolderName.trim() };
+    await db.insert("berkas_folders", f);
+    setBerkasFolders(fs => [f, ...fs]);
+    setNewFolderName("");
+  }
+  async function deleteFolder(id) {
+    if (!confirm("Hapus folder ini beserta semua berkas di dalamnya?")) return;
+    const docsInFolder = lpjDocs.filter(d => d.folder_id === id);
+    for (const d of docsInFolder) await db.delete("lpj_docs", d.id);
+    await db.delete("berkas_folders", id);
+    setLpjDocs(d => d.filter(x => x.folder_id !== id));
+    setBerkasFolders(fs => fs.filter(x => x.id !== id));
+    if (activeFolder === id) setActiveFolder(null);
   }
   async function addMember() {
     if (!newMember.name.trim()) return;
@@ -219,8 +268,14 @@ export default function App() {
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
 
+  const pageKey = tab + ":" + (activeEvent || "") + ":" + (activeFolder || "");
+
   return (
     <div style={S.page}>
+      <style>{`
+        @keyframes pageFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .page-fade-wrap { animation: pageFadeIn 0.4s ease; }
+      `}</style>
       <header style={S.header}>
         <div style={S.headerLeft}>
           <button style={S.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
@@ -324,6 +379,7 @@ export default function App() {
         </div>
       )}
 
+      <div key={pageKey} className="page-fade-wrap">
       {tab === "beranda" && (
         <>
           <div style={S.hero}>
@@ -407,7 +463,7 @@ export default function App() {
                   {events.map(ev => {
                     const photos = photosByEvent[ev.id] || []; const cover = photos[0]?.src;
                     return (
-                      <div key={ev.id} style={S.eventCard} onClick={() => setActiveEvent(ev.id)}>
+                      <div key={ev.id} style={S.eventCard} onClick={() => openEvent(ev.id)}>
                         <div style={S.eventCover}>
                           {cover ? <img src={cover} alt={ev.name} style={S.eventCoverImg} /> : <div style={S.eventCoverEmpty}>Belum ada foto</div>}
                           <div style={S.eventCoverBadge}>{photos.length} foto</div>
@@ -433,7 +489,7 @@ export default function App() {
         if (!event) return null;
         return (
           <main style={S.main}>
-            <button style={S.backBtn} onClick={() => setActiveEvent(null)}>← Kembali ke Galeri</button>
+            <button style={S.backBtn} onClick={() => window.history.back()}>← Kembali ke Galeri</button>
             <SectionHeader eyebrow={event.date ? formatDate(event.date) : "KEGIATAN"} title={event.name} />
             {event.description && <p style={S.eventDesc}>{event.description}</p>}
             {isAdmin && (
@@ -517,36 +573,75 @@ export default function App() {
         </main>
       )}
 
-      {tab === "lpj" && isAdmin && (
+      {tab === "lpj" && isAdmin && !activeFolder && (
         <main style={S.main}>
-          <SectionHeader eyebrow="PERTANGGUNGJAWABAN" title="Laporan Pertanggungjawaban (LPJ)" />
-          {isAdmin && (
-            <div style={S.formCard}>
-              <div style={S.formCardTitle}>+ Unggah Berkas LPJ</div>
-              <input style={S.input} placeholder="Judul berkas (opsional)" value={lpjTitle} onChange={e => setLpjTitle(e.target.value)} />
-              <input ref={lpjFileInputRef} type="file" multiple style={{display:"none"}} onChange={e => e.target.files.length && uploadLpjFiles(e.target.files)} />
-              <button style={{...S.primaryBtn,marginTop:12}} disabled={busy} onClick={() => lpjFileInputRef.current.click()}>{busy ? "Mengunggah…" : "Pilih Berkas / Foto"}</button>
+          <SectionHeader eyebrow="PERTANGGUNGJAWABAN" title="BERKAS" />
+          <div style={S.formCard}>
+            <div style={S.formCardTitle}>+ Buat Folder Baru</div>
+            <div style={S.formRow}>
+              <input style={S.input} placeholder="Nama folder (mis. LPJ Kegiatan A, Proposal, dst)" value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key==="Enter" && addFolder()} />
+              <button style={S.primaryBtn} onClick={addFolder}>Buat Folder</button>
             </div>
-          )}
-          {lpjDocs.length === 0 ? <div style={S.emptyState}>Belum ada berkas LPJ.</div> : (
-            <div style={S.docGrid}>
-              {lpjDocs.map(d => (
-                <div key={d.id} style={S.docCard}>
-                  {d.is_image ? <img src={d.data_url} alt={d.title} style={S.docThumb} onClick={() => setLightbox(d.data_url)} /> : <div style={S.docIconWrap} onClick={() => window.open(d.data_url,"_blank")}><DocIcon /></div>}
-                  <div style={S.docBody}>
-                    <div style={S.docTitle}>{d.title}</div>
-                    <div style={S.docMeta}>{d.name} · {formatDate(d.date)}</div>
-                    <div style={{display:"flex",gap:10,marginTop:6}}>
-                      <a href={d.data_url} download={d.name} style={S.docLink}>Unduh</a>
-                      {isAdmin && <button style={S.deleteLink} onClick={() => deleteLpjDoc(d.id)}>Hapus</button>}
+          </div>
+          {berkasFolders.length === 0 ? <div style={S.emptyState}>Belum ada folder.</div> : (
+            <div style={S.eventGrid}>
+              {berkasFolders.map(f => {
+                const count = lpjDocs.filter(d => d.folder_id === f.id).length;
+                return (
+                  <div key={f.id} style={S.eventCard} onClick={() => openFolder(f.id)}>
+                    <div style={S.eventCover}>
+                      <div style={{...S.eventCoverEmpty,fontSize:44,opacity:0.6,fontStyle:"normal"}}>📁</div>
+                      <div style={S.eventCoverBadge}>{count} berkas</div>
+                    </div>
+                    <div style={S.eventCardBody}>
+                      <div style={S.eventCardName}>{f.name}</div>
+                      <div style={{display:"flex",gap:10,marginTop:8}}>
+                        <button style={S.deleteLink} onClick={e => {e.stopPropagation();deleteFolder(f.id);}}>Hapus Folder</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>
       )}
+
+      {tab === "lpj" && isAdmin && activeFolder && (() => {
+        const folder = berkasFolders.find(f => f.id === activeFolder);
+        const docsInFolder = lpjDocs.filter(d => d.folder_id === activeFolder);
+        if (!folder) return null;
+        return (
+          <main style={S.main}>
+            <button style={S.backBtn} onClick={() => window.history.back()}>← Kembali ke BERKAS</button>
+            <SectionHeader eyebrow="FOLDER" title={folder.name} />
+            <div style={S.formCard}>
+              <div style={S.formCardTitle}>+ Unggah Berkas</div>
+              <input style={S.input} placeholder="Judul berkas (opsional)" value={lpjTitle} onChange={e => setLpjTitle(e.target.value)} />
+              <input ref={lpjFileInputRef} type="file" multiple style={{display:"none"}} onChange={e => e.target.files.length && uploadLpjFiles(activeFolder, e.target.files)} />
+              <button style={{...S.primaryBtn,marginTop:12}} disabled={busy} onClick={() => lpjFileInputRef.current.click()}>{busy ? "Mengunggah…" : "Pilih Berkas / Foto"}</button>
+            </div>
+            {docsInFolder.length === 0 ? <div style={S.emptyState}>Belum ada berkas di folder ini.</div> : (
+              <div style={S.docGrid}>
+                {docsInFolder.map(d => (
+                  <div key={d.id} style={S.docCard}>
+                    {d.is_image ? <img src={d.data_url} alt={d.title} style={S.docThumb} onClick={() => setLightbox(d.data_url)} /> : <div style={S.docIconWrap} onClick={() => window.open(d.data_url,"_blank")}><DocIcon /></div>}
+                    <div style={S.docBody}>
+                      <div style={S.docTitle}>{d.title}</div>
+                      <div style={S.docMeta}>{d.name} · {formatDate(d.date)}</div>
+                      <div style={{display:"flex",gap:10,marginTop:6}}>
+                        <a href={d.data_url} download={d.name} style={S.docLink}>Unduh</a>
+                        <button style={S.deleteLink} onClick={() => deleteLpjDoc(d.id)}>Hapus</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </main>
+        );
+      })()}
+      </div>
 
       <footer style={S.footer}>
         <div style={S.footerTop}>
