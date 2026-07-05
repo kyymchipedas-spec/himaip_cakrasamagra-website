@@ -86,7 +86,7 @@ export default function App() {
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
   const [lpjTitle, setLpjTitle] = useState("");
-  const [newMember, setNewMember] = useState({ name: "", npm: "", jabatan: "", semester: "", photo: "" });
+  const [newMember, setNewMember] = useState({ name: "", npm: "", jabatan: "", semester: "", photo: "", music_fav: "", music_link: "" });
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [berkasFolders, setBerkasFolders] = useState([]);
@@ -228,7 +228,7 @@ export default function App() {
     const m = { id: "m_" + Date.now(), ...newMember };
     await db.insert("members", m);
     setMembers(mem => [...mem, m]);
-    setNewMember({ name: "", npm: "", jabatan: "", semester: "", photo: "" });
+    setNewMember({ name: "", npm: "", jabatan: "", semester: "", photo: "", music_fav: "", music_link: "" });
   }
   async function deleteMember(id) {
     await db.delete("members", id);
@@ -365,9 +365,11 @@ export default function App() {
             <input style={{...S.input,marginBottom:10}} placeholder="Nama" defaultValue={editingMember.name} onChange={e => setEditingMember(m => ({...m,name:e.target.value}))} />
             <input style={{...S.input,marginBottom:10}} placeholder="NPM" defaultValue={editingMember.npm} onChange={e => setEditingMember(m => ({...m,npm:e.target.value}))} />
             <input style={{...S.input,marginBottom:10}} placeholder="Jabatan" defaultValue={editingMember.jabatan} onChange={e => setEditingMember(m => ({...m,jabatan:e.target.value}))} />
-            <input style={{...S.input,marginBottom:14}} placeholder="Semester" defaultValue={editingMember.semester} onChange={e => setEditingMember(m => ({...m,semester:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} placeholder="Semester" defaultValue={editingMember.semester} onChange={e => setEditingMember(m => ({...m,semester:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" defaultValue={editingMember.music_fav} onChange={e => setEditingMember(m => ({...m,music_fav:e.target.value}))} />
+            <input style={{...S.input,marginBottom:14}} placeholder="Link lagu Spotify (open.spotify.com/track/...)" defaultValue={editingMember.music_link} onChange={e => setEditingMember(m => ({...m,music_link:e.target.value}))} />
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button style={S.primaryBtn} onClick={() => saveEditMember(editingMember.id,{name:editingMember.name,npm:editingMember.npm,jabatan:editingMember.jabatan,semester:editingMember.semester})}>Simpan</button>
+              <button style={S.primaryBtn} onClick={() => saveEditMember(editingMember.id,{name:editingMember.name,npm:editingMember.npm,jabatan:editingMember.jabatan,semester:editingMember.semester,music_fav:editingMember.music_fav,music_link:editingMember.music_link})}>Simpan</button>
               <button style={S.ghostBtn} onClick={() => setEditingMember(null)}>Batal</button>
             </div>
           </div>
@@ -534,6 +536,10 @@ export default function App() {
                 <input style={S.input} placeholder="Jabatan" value={newMember.jabatan} onChange={e => setNewMember(m=>({...m,jabatan:e.target.value}))} />
                 <input style={S.input} placeholder="Semester" value={newMember.semester} onChange={e => setNewMember(m=>({...m,semester:e.target.value}))} />
               </div>
+              <div style={{...S.formRow,marginTop:10}}>
+                <input style={S.input} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
+                <input style={S.input} placeholder="Link lagu Spotify (opsional)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
+              </div>
               <input ref={memberPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
                 const file = e.target.files[0]; if (!file) return;
                 compressImage(file, 400, 0.8).then(src => setNewMember(m=>({...m,photo:src})));
@@ -553,6 +559,16 @@ export default function App() {
                   <div style={S.memberRow}><span style={S.memberLabel}>NPM</span><span>{m.npm||"-"}</span></div>
                   <div style={S.memberRow}><span style={S.memberLabel}>Jabatan</span><span>{m.jabatan||"-"}</span></div>
                   <div style={S.memberRow}><span style={S.memberLabel}>Semester</span><span>{m.semester||"-"}</span></div>
+                  {m.music_fav && (
+                    <div style={S.memberRow}>
+                      <span style={{...S.memberLabel,color:"#fff",background:C.navy,padding:"1px 6px",borderRadius:3}}>Music Fav.</span>
+                      {m.music_link ? (
+                        <a href={m.music_link} target="_blank" rel="noreferrer" style={{color:"#1DB954",fontWeight:600,textDecoration:"none"}}>{m.music_fav}</a>
+                      ) : (
+                        <span style={{color:"#1DB954",fontWeight:600}}>{m.music_fav}</span>
+                      )}
+                    </div>
+                  )}
                   {isAdmin && <div style={{display:"flex",gap:10,marginTop:8}}><button style={S.deleteLink} onClick={() => setEditingMember(m)}>Edit</button><button style={S.deleteLink} onClick={() => deleteMember(m.id)}>Hapus</button></div>}
                 </div>
               ))}
