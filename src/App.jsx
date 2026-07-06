@@ -483,6 +483,7 @@ export default function App() {
               </div>
             </div>
             <div ref={announceRef} style={S.announceSection}>
+              <div style={S.announceInner}>
               <div style={S.announceLabel}>PENGUMUMAN</div>
               <div style={S.announceDivider} />
               {isAdmin && (
@@ -496,7 +497,7 @@ export default function App() {
                   <button style={{...S.primaryBtn,marginTop:12}} disabled={busy} onClick={() => announceFileRef.current.click()}>{busy ? "Mengunggah…" : "Pilih File / PDF"}</button>
                 </div>
               )}
-              {announcements.length === 0 ? <div style={S.emptyState}>Belum ada pengumuman.</div> : (
+              {announcements.length === 0 ? <div style={{...S.emptyState,color:"#999"}}>Belum ada pengumuman.</div> : (
                 <div style={S.announceList}>
                   {announcements.map(a => (
                     <div key={a.id} style={S.announceItem}>
@@ -519,6 +520,7 @@ export default function App() {
                   ))}
                 </div>
               )}
+              </div>
             </div>
             <div style={S.visiSection}>
               <div style={S.visiInner}>
@@ -896,17 +898,18 @@ const S = {
   backBtn:{background:"none",border:"none",color:C.red,fontWeight:600,fontSize:14,cursor:"pointer",padding:0,marginBottom:20,display:"block"},
   deleteLink:{background:"none",border:"none",color:C.red,fontSize:12.5,fontWeight:600,cursor:"pointer",padding:0,marginTop:8,display:"block"},
   emptyState:{textAlign:"center",padding:"60px 0",opacity:0.5,fontSize:15},
-  announceSection:{background:C.white,padding:"32px 20px 40px",maxWidth:760,margin:"0 auto"},
+  announceSection:{background:C.black,width:"100%",padding:"48px 20px"},
+  announceInner:{maxWidth:760,margin:"0 auto"},
   announceLabel:{fontSize:13,letterSpacing:2,color:C.gold,fontWeight:700,textTransform:"uppercase"},
-  announceDivider:{height:1,background:"#ddd3bd",margin:"10px 0 18px"},
+  announceDivider:{height:1,background:"rgba(255,255,255,0.18)",margin:"10px 0 18px"},
   announceList:{display:"flex",flexDirection:"column",gap:16},
-  announceItem:{borderBottom:"1px solid #ece5d6",paddingBottom:14},
-  announceDate:{fontSize:11,color:C.muted,marginBottom:4},
+  announceItem:{borderBottom:"1px solid rgba(255,255,255,0.1)",paddingBottom:14},
+  announceDate:{fontSize:11,color:"#9a9a9a",marginBottom:4},
   announceRow:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"},
   announceTitleWrap:{display:"flex",alignItems:"center"},
-  announceTitle:{fontWeight:700,fontSize:15.5,color:C.navy},
-  announceFileName:{fontSize:12,color:C.muted,marginTop:2,marginLeft:26},
-  announceLink:{color:C.red,fontWeight:700,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"},
+  announceTitle:{fontWeight:700,fontSize:15.5,color:C.white},
+  announceFileName:{fontSize:12,color:"#9a9a9a",marginTop:2,marginLeft:26},
+  announceLink:{color:"#E4666D",fontWeight:700,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"},
   eventDesc:{fontSize:15,lineHeight:1.6,opacity:0.8,marginBottom:20},
   modalOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:20},
   modalBox:{background:"#FAF7F2",borderRadius:8,padding:30,maxWidth:380,width:"100%",textAlign:"center"},
