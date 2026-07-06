@@ -97,6 +97,13 @@ export default function App() {
   const memberPhotoRef = useRef(null);
   const editMemberPhotoRef = useRef(null);
   const contentRef = useRef(null);
+  const announceRef = useRef(null);
+  const announceFileRef = useRef(null);
+  const editAnnounceFileRef = useRef(null);
+  const [announcements, setAnnouncements] = useState([]);
+  const [newAnnounceTitle, setNewAnnounceTitle] = useState("");
+  const [newAnnounceDate, setNewAnnounceDate] = useState("");
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -134,6 +141,8 @@ export default function App() {
       setLpjDocs(Array.isArray(lpj) ? lpj : []);
       const folders = await db.get("berkas_folders");
       setBerkasFolders(Array.isArray(folders) ? folders : []);
+      const ann = await db.get("announcements", "&order=created_at.desc");
+      setAnnouncements(Array.isArray(ann) ? ann : []);
       const mem = await db.get("members", "&order=created_at.asc");
       setMembers(Array.isArray(mem) ? mem : []);
     } catch(e) { console.error(e); }
@@ -159,6 +168,29 @@ export default function App() {
     window.history.pushState({ tab: "lpj", activeEvent: null, activeFolder: id }, "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  async function addAnnouncement(fileList) {
+    const file = fileList[0]; if (!file) return;
+    setBusy(true);
+    try {
+      const isImage = file.type.startsWith("image/");
+      const file_url = isImage ? await compressImage(file, 1200, 0.75) : await fileToDataUrl(file);
+      const item = { id: "a_" + Date.now() + Math.random().toString(36).slice(2,6), title: newAnnounceTitle.trim() || file.name, date: newAnnounceDate || new Date().toISOString().slice(0,10), file_url, file_name: file.name };
+      await db.insert("announcements", item);
+      setAnnouncements(a => [item, ...a]);
+      setNewAnnounceTitle(""); setNewAnnounceDate("");
+    } catch(e) { console.error(e); }
+    setBusy(false);
+  }
+  async function deleteAnnouncement(id) {
+    await db.delete("announcements", id);
+    setAnnouncements(a => a.filter(x => x.id !== id));
+  }
+  async function saveEditAnnouncement(id, data) {
+    await db.update("announcements", id, data);
+    setAnnouncements(a => a.map(x => x.id === id ? {...x, ...data} : x));
+    setEditingAnnouncement(null);
+  }
+  function scrollToAnnounce() { announceRef.current?.scrollIntoView({ behavior: "smooth" }); }
   function scrollToContent() { contentRef.current?.scrollIntoView({ behavior: "smooth" }); }
 
   async function addEvent() {
@@ -388,6 +420,26 @@ export default function App() {
           </div>
         </div>
       )}
+      {editingAnnouncement && (
+        <div style={S.modalOverlay} onClick={() => setEditingAnnouncement(null)}>
+          <div style={{...S.modalBox,textAlign:"left"}} onClick={e => e.stopPropagation()}>
+            <div style={{...S.modalTitle,textAlign:"center"}}>Edit Pengumuman</div>
+            <input style={{...S.input,marginBottom:10}} placeholder="Judul pengumuman" defaultValue={editingAnnouncement.title} onChange={e => setEditingAnnouncement(a => ({...a,title:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} type="date" defaultValue={editingAnnouncement.date} onChange={e => setEditingAnnouncement(a => ({...a,date:e.target.value}))} />
+            <div style={{fontSize:12,color:C.muted,marginBottom:8}}>{editingAnnouncement.file_name ? `Berkas saat ini: ${editingAnnouncement.file_name}` : "Belum ada berkas"}</div>
+            <input ref={editAnnounceFileRef} type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={e => {
+              const file = e.target.files[0]; if (!file) return;
+              const isImage = file.type.startsWith("image/");
+              (isImage ? compressImage(file,1200,0.75) : fileToDataUrl(file)).then(file_url => setEditingAnnouncement(a => ({...a,file_url,file_name:file.name})));
+            }} />
+            <button style={{...S.ghostBtn,marginBottom:14,width:"100%"}} onClick={() => editAnnounceFileRef.current.click()}>Ganti Berkas / PDF</button>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button style={S.primaryBtn} onClick={() => saveEditAnnouncement(editingAnnouncement.id,{title:editingAnnouncement.title,date:editingAnnouncement.date,file_url:editingAnnouncement.file_url,file_name:editingAnnouncement.file_name})}>Simpan</button>
+              <button style={S.ghostBtn} onClick={() => setEditingAnnouncement(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
       {lightbox && (
         <div style={S.lightboxOverlay} onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="" style={S.lightboxImg} onClick={e => e.stopPropagation()} />
@@ -406,6 +458,7 @@ export default function App() {
               <div style={S.heroEyebrow}>HIMA IP — CAKRA SAMAGRA</div>
               <h1 style={S.heroTitle}>Bersama Almamater,<br/>Berkarya untuk Bangsa</h1>
               <button style={S.discoverBtn} onClick={scrollToContent}>What about ↓</button>
+              <button style={{...S.discoverBtn,marginTop:10}} onClick={scrollToAnnounce}>PENGUMUMAN ↓</button>
             </div>
           </div>
           <div ref={contentRef}>
@@ -428,6 +481,44 @@ export default function App() {
                 <StatCard num={totalPhotos} label="Foto" />
                 <StatCard num={members.length} label="Anggota" />
               </div>
+            </div>
+            <div ref={announceRef} style={S.announceSection}>
+              <div style={S.announceLabel}>PENGUMUMAN</div>
+              <div style={S.announceDivider} />
+              {isAdmin && (
+                <div style={S.formCard}>
+                  <div style={S.formCardTitle}>+ Buat Pengumuman</div>
+                  <div style={S.formRow}>
+                    <input style={S.input} placeholder="Judul pengumuman" value={newAnnounceTitle} onChange={e => setNewAnnounceTitle(e.target.value)} />
+                    <input style={S.input} type="date" value={newAnnounceDate} onChange={e => setNewAnnounceDate(e.target.value)} />
+                  </div>
+                  <input ref={announceFileRef} type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={e => e.target.files.length && addAnnouncement(e.target.files)} />
+                  <button style={{...S.primaryBtn,marginTop:12}} disabled={busy} onClick={() => announceFileRef.current.click()}>{busy ? "Mengunggah…" : "Pilih File / PDF"}</button>
+                </div>
+              )}
+              {announcements.length === 0 ? <div style={S.emptyState}>Belum ada pengumuman.</div> : (
+                <div style={S.announceList}>
+                  {announcements.map(a => (
+                    <div key={a.id} style={S.announceItem}>
+                      <div style={S.announceDate}>{formatDate(a.date)}</div>
+                      <div style={S.announceRow}>
+                        <div style={S.announceTitleWrap}>
+                          <span style={{marginRight:6}}>🔊</span>
+                          <span style={S.announceTitle}>{a.title}</span>
+                        </div>
+                        <a href={a.file_url} target="_blank" rel="noreferrer" style={S.announceLink}>LIHAT PDF</a>
+                      </div>
+                      {a.file_name && <div style={S.announceFileName}>{a.file_name}</div>}
+                      {isAdmin && (
+                        <div style={{display:"flex",gap:10,marginTop:6}}>
+                          <button style={S.deleteLink} onClick={() => setEditingAnnouncement(a)}>Edit</button>
+                          <button style={S.deleteLink} onClick={() => deleteAnnouncement(a.id)}>Hapus</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={S.visiSection}>
               <div style={S.visiInner}>
@@ -805,6 +896,17 @@ const S = {
   backBtn:{background:"none",border:"none",color:C.red,fontWeight:600,fontSize:14,cursor:"pointer",padding:0,marginBottom:20,display:"block"},
   deleteLink:{background:"none",border:"none",color:C.red,fontSize:12.5,fontWeight:600,cursor:"pointer",padding:0,marginTop:8,display:"block"},
   emptyState:{textAlign:"center",padding:"60px 0",opacity:0.5,fontSize:15},
+  announceSection:{background:C.white,padding:"32px 20px 40px",maxWidth:760,margin:"0 auto"},
+  announceLabel:{fontSize:13,letterSpacing:2,color:C.gold,fontWeight:700,textTransform:"uppercase"},
+  announceDivider:{height:1,background:"#ddd3bd",margin:"10px 0 18px"},
+  announceList:{display:"flex",flexDirection:"column",gap:16},
+  announceItem:{borderBottom:"1px solid #ece5d6",paddingBottom:14},
+  announceDate:{fontSize:11,color:C.muted,marginBottom:4},
+  announceRow:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"},
+  announceTitleWrap:{display:"flex",alignItems:"center"},
+  announceTitle:{fontWeight:700,fontSize:15.5,color:C.navy},
+  announceFileName:{fontSize:12,color:C.muted,marginTop:2,marginLeft:26},
+  announceLink:{color:C.red,fontWeight:700,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"},
   eventDesc:{fontSize:15,lineHeight:1.6,opacity:0.8,marginBottom:20},
   modalOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:20},
   modalBox:{background:"#FAF7F2",borderRadius:8,padding:30,maxWidth:380,width:"100%",textAlign:"center"},
