@@ -329,7 +329,7 @@ export default function App() {
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
             <div style={S.drawerTitle}>HIMA IP</div>
-            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["lpj","BERKAS"]].map(([key,label]) => (
+            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["lpj","BERKAS"]].map(([key,label]) => (
               <button key={key} style={{...S.drawerItem,...(tab===key?S.drawerItemActive:{})}} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -683,6 +683,149 @@ export default function App() {
         </main>
       )}
 
+      {tab === "tentang" && (
+        <>
+          <div style={S.tentangHero}>
+            <img src="/foto-hero-tentang.jpg" alt="" style={S.tentangHeroImg} onError={e => e.target.style.display="none"} />
+            <div style={S.tentangHeroOverlay} />
+            <div style={S.tentangHeroContent}>
+              <img src="/logo-hima-ip.png" alt="Logo HIMA IP" style={S.tentangHeroLogo} onError={e => e.target.style.display="none"} />
+              <div>
+                <div style={S.tentangHeroEyebrow}>Tentang</div>
+                <div style={S.tentangHeroTitle}>HIMA IP</div>
+              </div>
+            </div>
+            <div style={S.tentangHeroDesc}>
+              Mengenal HIMA IP lebih dekat sebagai organisasi mahasiswa yang tumbuh bersama semangat kepemimpinan, kolaborasi, dan pengabdian bagi Program Studi Ilmu Pemerintahan STISIP Tasikmalaya.
+            </div>
+          </div>
+
+          <main style={{...S.main, paddingTop:50}}>
+            {/* Sejarah */}
+            <div style={S.sejarahRow}>
+              <div style={S.sejarahText}>
+                <div style={S.sejarahHeadRow}>
+                  <div style={S.sejarahIconBox}><IconHistory /></div>
+                  <h2 style={S.sejarahTitle}>Sejarah HIMA IP</h2>
+                </div>
+                <p style={S.sejarahBody}>
+                  Himpunan Mahasiswa Program Studi Ilmu Pemerintahan (HIMA IP) STISIP Tasikmalaya merupakan organisasi kemahasiswaan yang menjadi wadah pengembangan potensi, kepemimpinan, dan pengabdian mahasiswa Program Studi Ilmu Pemerintahan. HIMA IP resmi berdiri pada 28 Oktober 2017 dan hingga saat ini terus berperan aktif dalam mendukung kegiatan akademik maupun non-akademik di lingkungan STISIP Tasikmalaya.
+                </p>
+              </div>
+              <div style={S.sejarahBadge}>
+                <div style={S.sejarahBadgeIcon}><IconCalendar /></div>
+                <div>
+                  <div style={S.sejarahBadgeLabel}>Didirikan pada</div>
+                  <div style={S.sejarahBadgeDate}>28 Oktober 2017</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Identitas & Landasan */}
+            <div style={S.darkPanel}>
+              <div style={S.twoColGrid}>
+                <div>
+                  <h3 style={S.darkPanelTitle}>Identitas Organisasi</h3>
+                  {[
+                    ["Nama","Himpunan Mahasiswa Ilmu Pemerintahan"],
+                    ["Singkatan","HIMA IP"],
+                    ["Kedudukan","Program Studi Ilmu Pemerintahan STISIP Tasikmalaya"],
+                    ["Didirikan","28 Oktober 2017"],
+                    ["Keanggotaan","16 Orang (Seluruh Mahasiswa Aktif Program Studi Ilmu Pemerintahan)"],
+                  ].map(([label,val]) => (
+                    <div key={label} style={S.identRow}>
+                      <div style={S.identLabel}>{label}</div>
+                      <div style={S.identColon}>:</div>
+                      <div style={S.identVal}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <h3 style={S.darkPanelTitle}>Landasan Organisasi</h3>
+                  {[
+                    [<IconGaruda key="g" />, "Landasan Idiil", "Pancasila"],
+                    [<IconBook key="b" />, "Landasan Konstitusional", "UUD Negara Republik Indonesia tahun 1945"],
+                    [<IconDoc key="d" />, "Landasan Operasional", "Berpedoman pada peraturan organisasi kemahasiswaan yang berlaku di STISIP Tasikmalaya"],
+                  ].map(([icon,title,desc]) => (
+                    <div key={title} style={S.landasanRow}>
+                      <div style={S.landasanIcon}>{icon}</div>
+                      <div>
+                        <div style={S.landasanTitle}>{title}</div>
+                        <div style={S.landasanDesc}>{desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Asas & Tujuan */}
+            <div style={S.twoColGrid}>
+              <div>
+                <h3 style={S.lightPanelTitle}>Asas Organisasi</h3>
+                <div style={S.asasGrid}>
+                  {[
+                    [<IconDoor key="1" />, "Keterbukaan", "Menjunjung tinggi transparansi dalam menjalankan organisasi"],
+                    [<IconScale key="2" />, "Keseimbangan", "Tidak berpihak pada kepentingan politik praktis"],
+                    [<IconHandshake key="3" />, "Kebersamaan", "Mengutamakan persatuan dan kerja sama"],
+                    [<IconBallot key="4" />, "Demokrasi", "Mengutamakan musyawarah dalam pengambilan keputusan"],
+                  ].map(([icon,title,desc]) => (
+                    <div key={title} style={S.asasCard}>
+                      <div style={S.asasIcon}>{icon}</div>
+                      <div style={S.asasTitle}>{title}</div>
+                      <div style={S.asasDesc}>{desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 style={S.lightPanelTitle}>Tujuan HIMA IP</h3>
+                <div style={S.tujuanList}>
+                  {[
+                    "Mengembangkan potensi dan kreativitas mahasiswa.",
+                    "Menciptakan suasana akademik yang dinamis.",
+                    "Membangun solidaritas antar mahasiswa.",
+                    "Mendorong inovasi dan pengembangan diri.",
+                    "Berkontribusi bagi Program Studi, kampus, dan masyarakat.",
+                  ].map((t,i) => (
+                    <div key={i} style={S.tujuanItem}>
+                      <span style={S.tujuanDot} />
+                      <span>{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* Fungsi */}
+          <div style={S.fungsiSection}>
+            <div style={S.fungsiInner}>
+              <h3 style={S.fungsiTitle}>Fungsi HIMA IP</h3>
+              <div style={S.fungsiGrid}>
+                {[
+                  [<IconChat key="1" />, "Aspiratif", "Menjadi wadah untuk menghimpun, menampung, dan menyalurkan aspirasi mahasiswa Program Studi Ilmu Pemerintahan secara konstruktif."],
+                  [<IconShield key="2" />, "Advokatif", "Berperan dalam memperjuangkan hak, kepentingan, serta memberikan pendampingan terhadap mahasiswa sesuai ketentuan organisasi."],
+                  [<IconUsersGear key="3" />, "Koordinatif", "Menjalin komunikasi, koordinasi, dan kerja sama dengan civitas akademika maupun organisasi kemahasiswaan lainnya demi tercapainya tujuan bersama."],
+                  [<IconRocket key="4" />, "Katalisator & Fasilitator", "Menjadi penggerak sekaligus fasilitator dalam mendukung pengembangan potensi, kreativitas, serta kualitas mahasiswa melalui berbagai program kerja organisasi."],
+                ].map(([icon,title,desc]) => (
+                  <div key={title} style={S.fungsiCard}>
+                    <div style={S.fungsiIcon}>{icon}</div>
+                    <div style={S.fungsiCardTitle}>{title}</div>
+                    <div style={S.fungsiCardDesc}>{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Quote penutup */}
+          <div style={S.tentangQuoteBar}>
+            "Bersama Almamater, Berkarya untuk Bangsa"
+          </div>
+        </>
+      )}
+
       {tab === "lpj" && !isAdmin && (
         <main style={S.main}>
           <div style={{textAlign:"center",padding:"80px 20px"}}>
@@ -817,6 +960,109 @@ function DocIcon() {
     </svg>
   );
 }
+function IconHistory() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v4h4" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+function IconBook() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 4.5v17" />
+    </svg>
+  );
+}
+function IconDoc() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M8 13h8M8 17h8" />
+    </svg>
+  );
+}
+function IconGaruda() {
+  return (
+    <img src="/garuda-pancasila.png" alt="Garuda Pancasila" style={{width:24,height:24,objectFit:"contain"}} onError={e => e.target.style.display="none"} />
+  );
+}
+function IconDoor() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M13 4 6 5.5v15L13 19z" />
+      <path d="M13 4h5v16h-5M10 12v.01" />
+    </svg>
+  );
+}
+function IconScale() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 3v18M5 8h14M5 8 2 15a3 3 0 0 0 6 0zM19 8l-3 7a3 3 0 0 0 6 0z" />
+    </svg>
+  );
+}
+function IconHandshake() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M8 12 3 17l2 2 1-1M16 12l5 5-2 2-1-1" />
+      <path d="M8 12l3-3 2 2 3-3 3 3-4 4-2-2-2 2z" />
+    </svg>
+  );
+}
+function IconBallot() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 8h16v13H4z" />
+      <path d="M9 8V5a3 3 0 0 1 6 0v3M12 12v4M9.5 14.5h5" />
+    </svg>
+  );
+}
+function IconChat() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M21 12a8 8 0 0 1-11.5 7.2L3 21l1.8-6.4A8 8 0 1 1 21 12z" />
+      <path d="M8 11h8M8 14h5" />
+    </svg>
+  );
+}
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5z" />
+    </svg>
+  );
+}
+function IconUsersGear() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+      <circle cx="18" cy="7" r="2" />
+      <path d="M18 10.5v1M18 15.5v1M15 12.5h1M20 12.5h1M15.9 10.4l.7.7M19.4 13.9l.7.7M19.4 10.4l-.7.7M15.9 13.9l.7.7" />
+    </svg>
+  );
+}
+function IconRocket() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M5 16s-1-4 3-8c3-3 8-4 8-4s-1 5-4 8c-4 4-7 3-7 3z" />
+      <circle cx="13" cy="8" r="1.5" />
+      <path d="M8 13l-3 5 5-3M9 17l-1 3M4 15l3-1" />
+    </svg>
+  );
+}
 
 const C = { black:"#0A0A0A", gold:"#B68A3D", white:"#FFFFFF", offwhite:"#F5F0E8", red:"#8C2E33", navy:"#1B2A45", muted:"#666666" };
 
@@ -927,5 +1173,62 @@ const S = {
   socialLink:{color:"rgba(255,255,255,0.8)",fontSize:14,textDecoration:"none",fontWeight:500},
   socialSep:{color:"rgba(182,138,61,0.5)",fontSize:14},
   gmapsLink:{color:"rgba(255,255,255,0.7)",fontSize:13,textDecoration:"underline",display:"block",marginTop:6},
-  footerBottom:{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:20,fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"}
+  footerBottom:{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:20,fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"},
+
+  // ===== Tentang HIMA IP =====
+  tentangHero:{position:"relative",marginTop:58,padding:"60px 40px 40px",background:C.black,overflow:"hidden",minHeight:260,display:"flex",flexDirection:"column",justifyContent:"center"},
+  tentangHeroImg:{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:0.35},
+  tentangHeroOverlay:{position:"absolute",inset:0,background:"linear-gradient(100deg, rgba(10,10,10,0.95) 30%, rgba(10,10,10,0.55) 100%)"},
+  tentangHeroContent:{position:"relative",zIndex:1,display:"flex",alignItems:"center",gap:18,marginBottom:20},
+  tentangHeroLogo:{width:56,height:56,objectFit:"contain",borderRadius:"50%",background:"rgba(255,255,255,0.06)",border:`1px solid ${C.gold}`,padding:6},
+  tentangHeroEyebrow:{fontSize:13,letterSpacing:3,color:C.white,fontWeight:500,textTransform:"uppercase"},
+  tentangHeroTitle:{fontFamily:"Georgia,serif",fontSize:"clamp(30px,5vw,52px)",fontWeight:700,color:C.gold,lineHeight:1},
+  tentangHeroDesc:{position:"relative",zIndex:1,fontSize:14.5,lineHeight:1.8,color:"rgba(255,255,255,0.8)",maxWidth:640},
+
+  sejarahRow:{display:"flex",gap:28,flexWrap:"wrap",alignItems:"stretch",marginBottom:50},
+  sejarahText:{flex:"2 1 380px"},
+  sejarahHeadRow:{display:"flex",alignItems:"center",gap:14,marginBottom:16},
+  sejarahIconBox:{width:44,height:44,borderRadius:8,background:C.offwhite,border:"1px solid #e0d8c8",display:"flex",alignItems:"center",justifyContent:"center",color:C.navy,flexShrink:0},
+  sejarahTitle:{fontFamily:"Georgia,serif",fontSize:24,fontWeight:700,color:C.navy,margin:0},
+  sejarahBody:{fontSize:14.5,lineHeight:1.8,color:"#333",margin:0},
+  sejarahBadge:{flex:"1 1 220px",display:"flex",alignItems:"center",gap:14,background:C.black,borderRadius:10,padding:"22px 20px",minWidth:220},
+  sejarahBadgeIcon:{width:44,height:44,borderRadius:"50%",background:C.gold,display:"flex",alignItems:"center",justifyContent:"center",color:C.black,flexShrink:0},
+  sejarahBadgeLabel:{fontSize:12.5,color:"rgba(255,255,255,0.7)"},
+  sejarahBadgeDate:{fontFamily:"Georgia,serif",fontSize:19,fontWeight:700,color:C.gold,marginTop:2},
+
+  darkPanel:{background:C.black,borderRadius:12,padding:"36px 32px",marginBottom:50},
+  darkPanelTitle:{fontFamily:"Georgia,serif",fontSize:20,fontWeight:700,color:C.gold,margin:"0 0 20px"},
+  twoColGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:36,marginBottom:50},
+
+  identRow:{display:"flex",gap:8,fontSize:13.5,marginBottom:12,color:"rgba(255,255,255,0.85)"},
+  identLabel:{minWidth:88,color:C.gold,fontWeight:600},
+  identColon:{opacity:0.5},
+  identVal:{flex:1,lineHeight:1.5},
+
+  landasanRow:{display:"flex",gap:14,marginBottom:20,alignItems:"flex-start"},
+  landasanIcon:{width:38,height:38,borderRadius:"50%",background:"rgba(182,138,61,0.15)",border:`1px solid ${C.gold}`,display:"flex",alignItems:"center",justifyContent:"center",color:C.gold,flexShrink:0},
+  landasanTitle:{fontSize:13.5,fontWeight:700,color:C.gold,textTransform:"uppercase",letterSpacing:0.5,marginBottom:3},
+  landasanDesc:{fontSize:13.5,lineHeight:1.6,color:"rgba(255,255,255,0.75)"},
+
+  lightPanelTitle:{fontFamily:"Georgia,serif",fontSize:20,fontWeight:700,color:C.navy,margin:"0 0 20px"},
+  asasGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:16},
+  asasCard:{textAlign:"center",padding:"18px 10px",background:C.offwhite,borderRadius:10,border:"1px solid #e0d8c8"},
+  asasIcon:{width:46,height:46,borderRadius:"50%",background:C.white,border:`1.5px solid ${C.navy}`,display:"flex",alignItems:"center",justifyContent:"center",color:C.navy,margin:"0 auto 10px"},
+  asasTitle:{fontWeight:700,fontSize:13.5,color:C.navy,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5},
+  asasDesc:{fontSize:12,lineHeight:1.5,color:C.muted},
+
+  tujuanList:{display:"flex",flexDirection:"column",gap:14},
+  tujuanItem:{display:"flex",alignItems:"flex-start",gap:10,fontSize:14,lineHeight:1.6,color:"#333"},
+  tujuanDot:{width:8,height:8,borderRadius:"50%",background:C.red,marginTop:6,flexShrink:0},
+
+  fungsiSection:{background:C.black,padding:"60px 40px",marginTop:10},
+  fungsiInner:{maxWidth:1100,margin:"0 auto"},
+  fungsiTitle:{fontFamily:"Georgia,serif",fontSize:26,fontWeight:700,color:C.gold,textAlign:"center",margin:"0 0 40px"},
+  fungsiGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:28},
+  fungsiCard:{textAlign:"center",padding:"10px 14px"},
+  fungsiIcon:{width:64,height:64,borderRadius:"50%",background:"rgba(182,138,61,0.12)",border:`1.5px solid ${C.gold}`,display:"flex",alignItems:"center",justifyContent:"center",color:C.gold,margin:"0 auto 16px"},
+  fungsiCardTitle:{fontWeight:700,fontSize:15,color:C.white,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5},
+  fungsiCardDesc:{fontSize:12.5,lineHeight:1.6,color:"rgba(255,255,255,0.7)"},
+
+  tentangQuoteBar:{background:C.black,borderTop:`2px solid ${C.gold}`,padding:"36px 20px",textAlign:"center",fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:"clamp(16px,3vw,24px)",fontWeight:700,color:C.gold}
 };
