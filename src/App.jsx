@@ -366,7 +366,7 @@ export default function App() {
           <div style={{...S.modalBox,textAlign:"left"}} onClick={e => e.stopPropagation()}>
             <div style={{...S.modalTitle,textAlign:"center"}}>Edit Anggota</div>
             <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-              <div style={{width:100,height:100,borderRadius:8,overflow:"hidden",background:"#f0ebe0",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{width:120,aspectRatio:"3/4",borderRadius:8,overflow:"hidden",background:"#f0ebe0",display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {editingMember.photo ? <img src={editingMember.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span style={{fontSize:32,opacity:0.4}}>📷</span>}
               </div>
             </div>
@@ -379,7 +379,7 @@ export default function App() {
             <input style={{...S.input,marginBottom:10}} placeholder="NPM" defaultValue={editingMember.npm} onChange={e => setEditingMember(m => ({...m,npm:e.target.value}))} />
             <input style={{...S.input,marginBottom:10}} placeholder="Jabatan" defaultValue={editingMember.jabatan} onChange={e => setEditingMember(m => ({...m,jabatan:e.target.value}))} />
             <input style={{...S.input,marginBottom:10}} placeholder="Semester" defaultValue={editingMember.semester} onChange={e => setEditingMember(m => ({...m,semester:e.target.value}))} />
-            <input style={{...S.input,marginBottom:10}} placeholder="Music Fav. (mis. Judul Lagu - Penyanyi/Band)" defaultValue={editingMember.music_fav} onChange={e => setEditingMember(m => ({...m,music_fav:e.target.value}))} />
+            <input style={{...S.input,marginBottom:10}} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" defaultValue={editingMember.music_fav} onChange={e => setEditingMember(m => ({...m,music_fav:e.target.value}))} />
             <input style={{...S.input,marginBottom:14}} placeholder="Link lagu Spotify (open.spotify.com/track/...)" defaultValue={editingMember.music_link} onChange={e => setEditingMember(m => ({...m,music_link:e.target.value}))} />
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button style={S.primaryBtn} onClick={() => saveEditMember(editingMember.id,{name:editingMember.name,npm:editingMember.npm,jabatan:editingMember.jabatan,semester:editingMember.semester,music_fav:editingMember.music_fav,music_link:editingMember.music_link,photo:editingMember.photo})}>Simpan</button>
@@ -550,7 +550,7 @@ export default function App() {
                 <input style={S.input} placeholder="Semester" value={newMember.semester} onChange={e => setNewMember(m=>({...m,semester:e.target.value}))} />
               </div>
               <div style={{...S.formRow,marginTop:10}}>
-                <input style={S.input} placeholder="Music Fav. (mis. Judul Lagu - Penyanyi/Band)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
+                <input style={S.input} placeholder="Music Fav. (mis. Shape Of My Heart - Backstreet Boys)" value={newMember.music_fav} onChange={e => setNewMember(m=>({...m,music_fav:e.target.value}))} />
                 <input style={S.input} placeholder="Link lagu Spotify (opsional)" value={newMember.music_link} onChange={e => setNewMember(m=>({...m,music_link:e.target.value}))} />
               </div>
               <input ref={memberPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => {
@@ -574,7 +574,7 @@ export default function App() {
                   <div style={S.memberRow}><span style={S.memberLabel}>Semester</span><span>{m.semester||"-"}</span></div>
                   {m.music_fav && (
                     <div style={S.memberRow}>
-                      <span style={S.memberLabel}>Music Fav.</span>
+                      <span style={S.memberLabel}>🎵 Music Fav.</span>
                       {m.music_link ? (
                         <a href={m.music_link} target="_blank" rel="noreferrer" className="music-link" title={`${m.music_fav} — 🎵 Buka di Spotify`}>{m.music_fav}</a>
                       ) : (
@@ -786,7 +786,7 @@ const S = {
   photoDeleteBtn:{position:"absolute",top:6,right:6,background:"rgba(140,46,51,0.9)",color:C.white,border:"none",borderRadius:4,width:26,height:26,cursor:"pointer",fontSize:13},
   memberGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:20},
   memberCard:{background:C.white,border:"1px solid #e0d8c8",borderRadius:8,padding:16},
-  memberPhotoWrap:{width:"100%",height:160,background:"#f0ebe0",borderRadius:6,overflow:"hidden",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center"},
+  memberPhotoWrap:{width:"100%",aspectRatio:"3/4",background:"#f0ebe0",borderRadius:6,overflow:"hidden",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center"},
   memberPhoto:{width:"100%",height:"100%",objectFit:"cover"},
   memberPhotoEmpty:{fontSize:36,opacity:0.4},
   memberName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:15.5,color:C.navy,marginBottom:10},
