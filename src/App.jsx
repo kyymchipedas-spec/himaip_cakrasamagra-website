@@ -686,7 +686,7 @@ export default function App() {
       {tab === "tentang" && (
         <>
           <div style={S.tentangHero}>
-            <img src="/foto-hero-tentang.jpg" alt="" style={S.tentangHeroImg} onError={e => e.target.style.display="none"} />
+            <img src="/foto-hero-tentang.png" alt="" style={S.tentangHeroImg} onError={e => e.target.style.display="none"} />
             <div style={S.tentangHeroOverlay} />
             <div style={S.tentangHeroContent}>
               <img src="/logo-hima-ip.png" alt="Logo HIMA IP" style={S.tentangHeroLogo} onError={e => e.target.style.display="none"} />
@@ -743,7 +743,7 @@ export default function App() {
                 <div>
                   <h3 style={S.darkPanelTitle}>Landasan Organisasi</h3>
                   {[
-                    [<IconGaruda key="g" />, "Landasan Idiil", "Pancasila"],
+                    [<IconGaruda key="g" />, "Landasan IdiiI", "Pancasila"],
                     [<IconBook key="b" />, "Landasan Konstitusional", "UUD Negara Republik Indonesia tahun 1945"],
                     [<IconDoc key="d" />, "Landasan Operasional", "Berpedoman pada peraturan organisasi kemahasiswaan yang berlaku di STISIP Tasikmalaya"],
                   ].map(([icon,title,desc]) => (
