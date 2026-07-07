@@ -165,6 +165,57 @@ export default function App() {
   const [newAnnounceTitle, setNewAnnounceTitle] = useState("");
   const [newAnnounceDate, setNewAnnounceDate] = useState("");
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [visitorCount, setVisitorCount] = useState(null);
+
+  const searchResults = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const results = [];
+    events.forEach(ev => {
+      if ((ev.name||"").toLowerCase().includes(q) || (ev.description||"").toLowerCase().includes(q)) {
+        results.push({ key:"ev_"+ev.id, type:"Kegiatan", label: ev.name, onClick: () => { navigate("galeri"); setTimeout(() => openEvent(ev.id), 50); } });
+      }
+    });
+    members.forEach(m => {
+      if ((m.name||"").toLowerCase().includes(q) || (m.jabatan||"").toLowerCase().includes(q) || (m.npm||"").toLowerCase().includes(q)) {
+        results.push({ key:"m_"+m.id, type:"Anggota", label: m.jabatan ? `${m.name} — ${m.jabatan}` : m.name, onClick: () => navigate("anggota") });
+      }
+    });
+    announcements.forEach(a => {
+      if ((a.title||"").toLowerCase().includes(q)) {
+        results.push({ key:"a_"+a.id, type:"Pengumuman", label: a.title, onClick: () => { navigate("beranda"); setTimeout(scrollToAnnounce, 300); } });
+      }
+    });
+    lpjDocs.forEach(d => {
+      if ((d.title||"").toLowerCase().includes(q) || (d.name||"").toLowerCase().includes(q)) {
+        results.push({ key:"d_"+d.id, type:"Berkas", label: d.title || d.name, onClick: () => { navigate("lpj"); if (d.folder_id) setTimeout(() => openFolder(d.folder_id), 50); } });
+      }
+    });
+    berkasFolders.forEach(f => {
+      if ((f.name||"").toLowerCase().includes(q)) {
+        results.push({ key:"f_"+f.id, type:"Folder", label: f.name, onClick: () => { navigate("lpj"); setTimeout(() => openFolder(f.id), 50); } });
+      }
+    });
+    return results.slice(0, 20);
+  }, [searchQuery, events, members, announcements, lpjDocs, berkasFolders]);
+
+  useEffect(() => {
+    function onScroll() { setShowScrollTop(window.scrollY > 400); }
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rpcCall("increment_visitor_count");
+        setVisitorCount(typeof res === "number" ? res : (res && res.increment_visitor_count));
+      } catch(e) { console.error(e); }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -471,10 +522,37 @@ export default function App() {
             {isAdmin ? "Keluar Admin" : "Masuk Admin"}
           </button>
         </div>
-        <div style={{...S.headerTitle, cursor:"pointer"}} onClick={() => navigate("beranda")}>
-          WEBSITE ARSIP HIMA IP
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <button style={S.searchIconBtn} onClick={() => setSearchOpen(o => !o)} title="Cari">🔍</button>
+          <div style={{...S.headerTitle, cursor:"pointer"}} onClick={() => navigate("beranda")}>
+            WEBSITE ARSIP HIMA IP
+          </div>
         </div>
       </header>
+
+      {searchOpen && (
+        <div style={S.searchPanel}>
+          <input
+            autoFocus
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === "Escape" && setSearchOpen(false)}
+            placeholder="Cari kegiatan, anggota, pengumuman, atau berkas..."
+            style={S.searchInput}
+          />
+          <div style={S.searchResults}>
+            {searchQuery.trim().length === 0 && <div style={S.searchEmpty}>Ketik kata kunci untuk mencari di seluruh website...</div>}
+            {searchQuery.trim().length > 0 && searchResults.length === 0 && <div style={S.searchEmpty}>Tidak ada hasil untuk "{searchQuery}"</div>}
+            {searchResults.map(r => (
+              <div key={r.key} style={S.searchResultItem} onClick={() => { r.onClick(); setSearchOpen(false); setSearchQuery(""); }}>
+                <span style={S.searchResultBadge}>{r.type}</span>
+                <span style={S.searchResultText}>{r.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {menuOpen && (
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
@@ -1103,9 +1181,17 @@ export default function App() {
               <span style={S.socialSep}>|</span>
               <a href="mailto:himaipstisiptasik@gmail.com" target="_blank" rel="noreferrer" style={S.socialLink}>✉️Email</a>
             </div>
+            <div style={S.visitorCounter}>
+              <span>👁️</span>
+              <span>{visitorCount !== null ? Number(visitorCount).toLocaleString("id-ID") : "…"} kali dikunjungi</span>
+            </div>
           </div>
         </div>
         <div style={S.footerBottom}>© 2026 HIMA IP Cakra Samagra — STISIP Tasikmalaya</div>
+
+      {showScrollTop && (
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={S.scrollTopBtn} title="Kembali ke atas">↑</button>
+      )}
       </footer>
     </div>
   );
@@ -1270,6 +1356,16 @@ const S = {
   header:{position:"fixed",top:0,left:0,right:0,zIndex:100,background:C.black,borderBottom:`2px solid ${C.gold}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",height:58,boxSizing:"border-box"},
   headerLeft:{display:"flex",alignItems:"center",gap:14},
   headerTitle:{fontFamily:"'Inter',sans-serif",fontWeight:700,fontSize:13,color:C.gold,letterSpacing:2,textTransform:"uppercase"},
+  searchIconBtn:{background:"none",border:"none",cursor:"pointer",fontSize:17,color:C.gold,padding:4,lineHeight:1},
+  searchPanel:{position:"fixed",top:58,left:0,right:0,zIndex:99,background:C.black,borderBottom:`2px solid ${C.gold}`,padding:"16px 20px",maxHeight:"70vh",overflowY:"auto",boxShadow:"0 8px 20px rgba(0,0,0,0.4)"},
+  searchInput:{width:"100%",padding:"11px 14px",borderRadius:6,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.06)",color:C.white,fontSize:14,boxSizing:"border-box",outline:"none",fontFamily:"'Inter',sans-serif"},
+  searchResults:{marginTop:12,display:"flex",flexDirection:"column",gap:2,maxWidth:640,marginLeft:"auto",marginRight:"auto"},
+  searchResultItem:{display:"flex",alignItems:"center",gap:10,padding:"11px 10px",borderRadius:6,cursor:"pointer"},
+  searchResultBadge:{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,color:C.gold,border:`1px solid ${C.gold}`,borderRadius:4,padding:"2px 7px",flexShrink:0},
+  searchResultText:{fontSize:13.5,color:C.white},
+  searchEmpty:{fontSize:13,color:"rgba(255,255,255,0.5)",padding:"10px 8px",maxWidth:640,marginLeft:"auto",marginRight:"auto"},
+  scrollTopBtn:{position:"fixed",bottom:24,right:24,zIndex:200,width:46,height:46,borderRadius:"50%",background:C.gold,color:C.black,border:"none",fontSize:20,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 12px rgba(0,0,0,0.35)"},
+  visitorCounter:{display:"flex",alignItems:"center",gap:8,marginTop:16,fontSize:13,color:"rgba(255,255,255,0.6)"},
   hamburger:{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",gap:5,padding:4},
   bar:{display:"block",width:24,height:2,background:C.white,borderRadius:2},
   adminBtnHeader:{background:C.red,color:C.white,border:"none",fontWeight:600,fontSize:13,padding:"7px 14px",borderRadius:4,cursor:"pointer",fontFamily:"'Inter',sans-serif"},
