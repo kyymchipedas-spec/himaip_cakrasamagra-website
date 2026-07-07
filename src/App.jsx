@@ -190,6 +190,7 @@ export default function App() {
   const [hofKabinet, setHofKabinet] = useState([]);
   const [hofView, setHofView] = useState("ketua");
   const [hofIndex, setHofIndex] = useState(0);
+  const [hofDir, setHofDir] = useState(1);
   const [hofFlipped, setHofFlipped] = useState(false);
   const [hofQuoteIdx, setHofQuoteIdx] = useState(0);
   const [hofScrollTarget, setHofScrollTarget] = useState(null);
@@ -564,6 +565,14 @@ export default function App() {
     setHofKetua(k => k.map(x => x.id === id ? { ...x, ...data } : x));
     setEditingKetua(null);
   }
+  function clearKetuaRole() {
+    if (!confirm("Hapus data kartu Ketua (nama, NPM, foto) pada periode ini?")) return;
+    setEditingKetua(k => ({ ...k, ketua_nama: "", ketua_npm: "", ketua_foto: "" }));
+  }
+  function clearWakilRole() {
+    if (!confirm("Hapus data kartu Wakil Ketua (nama, NPM, foto) pada periode ini?")) return;
+    setEditingKetua(k => ({ ...k, wakil_nama: "", wakil_npm: "", wakil_foto: "" }));
+  }
   async function deleteKetuaPeriode(id) {
     if (!confirm("Hapus periode kepengurusan ini beserta kartu Ketua & Wakil?")) return;
     await db.delete("hof_ketua", id);
@@ -600,11 +609,13 @@ export default function App() {
   function hofNext() {
     if (hofFlipped) { setHofFlipped(false); return; }
     if (hofCards.length === 0) return;
+    setHofDir(1);
     setHofIndex(i => (i + 1) % hofCards.length);
   }
   function hofPrev() {
     if (hofFlipped) { setHofFlipped(false); return; }
     if (hofCards.length === 0) return;
+    setHofDir(-1);
     setHofIndex(i => (i - 1 + hofCards.length) % hofCards.length);
   }
   function hofTouchStart(e) { hofTouchX.current = e.touches[0].clientX; }
@@ -632,6 +643,10 @@ export default function App() {
         .page-fade-wrap { animation: pageFadeIn 0.4s ease; }
         .music-link { color:#1DB954; font-weight:600; text-decoration:none; cursor:pointer; max-width:190px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; transition:color 0.15s ease; }
         .music-link:hover { color:#2FE271; text-decoration:underline; }
+        @keyframes hofSlideNext { from { opacity:0; transform:translateX(50px) scale(0.96); } to { opacity:1; transform:translateX(0) scale(1); } }
+        @keyframes hofSlidePrev { from { opacity:0; transform:translateX(-50px) scale(0.96); } to { opacity:1; transform:translateX(0) scale(1); } }
+        .hof-slide-next { animation: hofSlideNext 0.4s ease; }
+        .hof-slide-prev { animation: hofSlidePrev 0.4s ease; }
       `}</style>
       <header style={S.header}>
         <div style={S.headerLeft}>
@@ -827,21 +842,47 @@ export default function App() {
             <div style={S.modalTitle}>Edit Periode Ketua</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <input style={S.input} placeholder="Periode (mis. 2023-2024)" value={editingKetua.periode || ""} onChange={e => setEditingKetua(k => ({...k, periode: e.target.value}))} />
-              <div style={{fontWeight:700,fontSize:13,color:C.navy,marginTop:6}}>Ketua</div>
-              <input style={S.input} placeholder="Nama Ketua" value={editingKetua.ketua_nama || ""} onChange={e => setEditingKetua(k => ({...k, ketua_nama: e.target.value}))} />
-              <input style={S.input} placeholder="NPM Ketua" value={editingKetua.ketua_npm || ""} onChange={e => setEditingKetua(k => ({...k, ketua_npm: e.target.value}))} />
-              <input ref={ketuaFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.8).then(src => setEditingKetua(k => ({...k, ketua_foto: src})))} />
-              <button style={S.ghostBtn} onClick={() => ketuaFotoRef.current.click()}>{editingKetua.ketua_foto ? "Foto Ketua dipilih ✓" : "Pilih Foto Ketua"}</button>
-              <div style={{fontWeight:700,fontSize:13,color:C.navy,marginTop:6}}>Wakil Ketua</div>
-              <input style={S.input} placeholder="Nama Wakil" value={editingKetua.wakil_nama || ""} onChange={e => setEditingKetua(k => ({...k, wakil_nama: e.target.value}))} />
-              <input style={S.input} placeholder="NPM Wakil" value={editingKetua.wakil_npm || ""} onChange={e => setEditingKetua(k => ({...k, wakil_npm: e.target.value}))} />
-              <input ref={wakilFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.8).then(src => setEditingKetua(k => ({...k, wakil_foto: src})))} />
-              <button style={S.ghostBtn} onClick={() => wakilFotoRef.current.click()}>{editingKetua.wakil_foto ? "Foto Wakil dipilih ✓" : "Pilih Foto Wakil"}</button>
+
+              <div style={S.hofEditSection}>
+                <div style={S.hofEditSectionTitle}>Ketua</div>
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <div style={S.hofEditPhotoPreview}>
+                    {editingKetua.ketua_foto ? <img src={editingKetua.ketua_foto} alt="" style={S.hofEditPhotoImg} /> : <div style={{...S.hofPhotoEmpty,fontSize:22}}>👤</div>}
+                  </div>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
+                    <input style={S.input} placeholder="Nama Ketua" value={editingKetua.ketua_nama || ""} onChange={e => setEditingKetua(k => ({...k, ketua_nama: e.target.value}))} />
+                    <input style={S.input} placeholder="NPM Ketua" value={editingKetua.ketua_npm || ""} onChange={e => setEditingKetua(k => ({...k, ketua_npm: e.target.value}))} />
+                  </div>
+                </div>
+                <input ref={ketuaFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.8).then(src => setEditingKetua(k => ({...k, ketua_foto: src})))} />
+                <div style={{display:"flex",gap:10,marginTop:10}}>
+                  <button style={{...S.ghostBtn,flex:1}} onClick={() => ketuaFotoRef.current.click()}>{editingKetua.ketua_foto ? "Ganti Foto Ketua" : "Pilih Foto Ketua"}</button>
+                  <button style={S.deleteLink} onClick={clearKetuaRole}>Hapus Kartu Ketua</button>
+                </div>
+              </div>
+
+              <div style={S.hofEditSection}>
+                <div style={S.hofEditSectionTitle}>Wakil Ketua</div>
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <div style={S.hofEditPhotoPreview}>
+                    {editingKetua.wakil_foto ? <img src={editingKetua.wakil_foto} alt="" style={S.hofEditPhotoImg} /> : <div style={{...S.hofPhotoEmpty,fontSize:22}}>👤</div>}
+                  </div>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
+                    <input style={S.input} placeholder="Nama Wakil" value={editingKetua.wakil_nama || ""} onChange={e => setEditingKetua(k => ({...k, wakil_nama: e.target.value}))} />
+                    <input style={S.input} placeholder="NPM Wakil" value={editingKetua.wakil_npm || ""} onChange={e => setEditingKetua(k => ({...k, wakil_npm: e.target.value}))} />
+                  </div>
+                </div>
+                <input ref={wakilFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.8).then(src => setEditingKetua(k => ({...k, wakil_foto: src})))} />
+                <div style={{display:"flex",gap:10,marginTop:10}}>
+                  <button style={{...S.ghostBtn,flex:1}} onClick={() => wakilFotoRef.current.click()}>{editingKetua.wakil_foto ? "Ganti Foto Wakil" : "Pilih Foto Wakil"}</button>
+                  <button style={S.deleteLink} onClick={clearWakilRole}>Hapus Kartu Wakil</button>
+                </div>
+              </div>
             </div>
             <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center"}}>
               <button style={S.primaryBtn} onClick={() => saveEditKetua(editingKetua.id, {periode:editingKetua.periode, ketua_nama:editingKetua.ketua_nama, ketua_npm:editingKetua.ketua_npm, ketua_foto:editingKetua.ketua_foto, wakil_nama:editingKetua.wakil_nama, wakil_npm:editingKetua.wakil_npm, wakil_foto:editingKetua.wakil_foto})}>Simpan</button>
               <button style={S.ghostBtn} onClick={() => setEditingKetua(null)}>Batal</button>
-              <button style={{...S.deleteLink,marginLeft:"auto"}} onClick={() => { deleteKetuaPeriode(editingKetua.id); setEditingKetua(null); }}>Hapus Periode</button>
+              <button style={{...S.deleteLink,marginLeft:"auto"}} onClick={() => { deleteKetuaPeriode(editingKetua.id); setEditingKetua(null); }}>Hapus Periode Ini</button>
             </div>
           </div>
         </div>
@@ -859,8 +900,13 @@ export default function App() {
                 {hofKetua.map(k => <option key={k.id} value={k.periode}>{k.periode}</option>)}
               </select>
               <textarea style={{...S.input,minHeight:100,resize:"vertical"}} placeholder="Filosofi kabinet" value={editingKabinet.filosofi || ""} onChange={e => setEditingKabinet(k => ({...k, filosofi: e.target.value}))} />
-              <input ref={kabinetLogoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.85).then(src => setEditingKabinet(k => ({...k, logo: src})))} />
-              <button style={S.ghostBtn} onClick={() => kabinetLogoRef.current.click()}>{editingKabinet.logo ? "Logo dipilih ✓" : "Pilih Logo"}</button>
+              <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                <div style={S.hofEditPhotoPreview}>
+                  {editingKabinet.logo ? <img src={editingKabinet.logo} alt="" style={S.hofEditPhotoImg} /> : <div style={{...S.hofPhotoEmpty,fontSize:22}}>🛡️</div>}
+                </div>
+                <input ref={kabinetLogoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.85).then(src => setEditingKabinet(k => ({...k, logo: src})))} />
+                <button style={{...S.ghostBtn,flex:1}} onClick={() => kabinetLogoRef.current.click()}>{editingKabinet.logo ? "Ganti Logo" : "Pilih Logo"}</button>
+              </div>
             </div>
             <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center"}}>
               <button style={S.primaryBtn} onClick={() => saveEditKabinet(editingKabinet.id, {nama_kabinet:editingKabinet.nama_kabinet, periode:editingKabinet.periode, ketua_periode:editingKabinet.ketua_periode, filosofi:editingKabinet.filosofi, logo:editingKabinet.logo})}>Simpan</button>
@@ -1289,7 +1335,9 @@ export default function App() {
                 <>
                   <div style={S.hofCardStage} onTouchStart={hofTouchStart} onTouchEnd={hofTouchEnd}>
                     <button style={{...S.hofArrowBtn,left:0}} onClick={hofPrev} aria-label="Sebelumnya">‹</button>
-                    <KetuaCard card={hofCurrent} flipped={hofFlipped} onFlip={() => setHofFlipped(f => !f)} onLihatKabinet={() => goToKabinet(hofCurrent.periode)} isAdmin={isAdmin} onEdit={() => setEditingKetua(hofCurrent)} />
+                    <div key={hofIndex} className={hofDir === 1 ? "hof-slide-next" : "hof-slide-prev"}>
+                      <KetuaCard card={hofCurrent} flipped={hofFlipped} onFlip={() => setHofFlipped(f => !f)} onLihatKabinet={() => goToKabinet(hofCurrent.periode)} isAdmin={isAdmin} onEdit={() => setEditingKetua(hofCurrent)} />
+                    </div>
                     <button style={{...S.hofArrowBtn,right:0}} onClick={hofNext} aria-label="Berikutnya">›</button>
                   </div>
                   <div style={S.hofDots}>
@@ -1324,17 +1372,21 @@ export default function App() {
                 <div style={S.hofKabinetList}>
                   {hofKabinetSorted.map(k => (
                     <div key={k.id} ref={el => (kabinetRefs.current[k.id] = el)} style={S.hofKabinetItem}>
+                      <div style={S.hofCardCorner1} />
+                      <div style={S.hofCardCorner2} />
                       <div style={S.hofKabinetLogoWrap} onClick={() => setActiveKabinetModal(k)}>
                         {k.logo ? <img src={k.logo} alt={k.nama_kabinet} style={S.hofKabinetLogoImg} /> : <div style={S.hofKabinetLogoEmpty}>🛡️</div>}
                       </div>
-                      <div style={S.hofKabinetName}>{k.nama_kabinet || "Nama Kabinet"}</div>
-                      <div style={S.hofKabinetPeriode}>{k.periode ? "Periode " + k.periode : "-"}</div>
-                      {isAdmin && (
-                        <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:8}}>
-                          <button style={S.deleteLink} onClick={() => setEditingKabinet(k)}>Edit</button>
-                          <button style={S.deleteLink} onClick={() => deleteKabinet(k.id)}>Hapus</button>
-                        </div>
-                      )}
+                      <div style={S.hofKabinetInfo} onClick={() => setActiveKabinetModal(k)}>
+                        <div style={S.hofKabinetName}>{k.nama_kabinet || "Nama Kabinet"}</div>
+                        <div style={S.hofKabinetPeriode}>{k.periode ? "Periode " + k.periode : "-"}</div>
+                        {isAdmin && (
+                          <div style={{display:"flex",gap:14,marginTop:8}}>
+                            <button style={S.deleteLink} onClick={e => { e.stopPropagation(); setEditingKabinet(k); }}>Edit</button>
+                            <button style={S.deleteLink} onClick={e => { e.stopPropagation(); deleteKabinet(k.id); }}>Hapus</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1526,8 +1578,14 @@ function KetuaCard({ card, flipped, onFlip, onLihatKabinet, isAdmin, onEdit }) {
           <div style={S.hofTapHint}>Ketuk kartu untuk membalik ↺</div>
         </div>
         <div style={{...S.hofCardFace, ...S.hofCardBack}} onClick={onFlip}>
-          <div style={S.hofBatikPattern} />
-          <div style={S.hofBackContent}>
+          <img
+            src="/hof-card-back.png"
+            alt="Kartu Belakang"
+            style={S.hofBackFullImg}
+            onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }}
+          />
+          <div style={{...S.hofBackContent, display:"none"}}>
+            <div style={S.hofBatikPattern} />
             <div style={S.hofBackEyebrow}>Himpunan Mahasiswa</div>
             <div style={S.hofBackTitle}>Ilmu Pemerintahan</div>
             <div style={S.hofBackSub}>STISIP Tasikmalaya</div>
@@ -1757,7 +1815,7 @@ const S = {
   announceLink:{color:"#E4666D",fontWeight:700,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"},
   eventDesc:{fontSize:15,lineHeight:1.6,opacity:0.8,marginBottom:20},
   modalOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:20},
-  modalBox:{background:"#FAF7F2",borderRadius:8,padding:30,maxWidth:380,width:"100%",textAlign:"center"},
+  modalBox:{background:"#FAF7F2",borderRadius:8,padding:30,maxWidth:380,width:"100%",textAlign:"center",maxHeight:"85vh",overflowY:"auto",WebkitOverflowScrolling:"touch"},
   modalTitle:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:20,color:C.navy,marginBottom:16},
   errorText:{color:C.red,fontSize:13,marginTop:8},
   lightboxOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:600,padding:24,cursor:"zoom-out"},
@@ -1850,9 +1908,13 @@ const S = {
   hofCardCorner1:{position:"absolute",top:10,left:10,width:34,height:34,borderTop:`2px solid ${C.gold}`,borderLeft:`2px solid ${C.gold}`},
   hofCardCorner2:{position:"absolute",bottom:10,right:10,width:34,height:34,borderBottom:`2px solid ${C.gold}`,borderRight:`2px solid ${C.gold}`},
   hofEditBtn:{position:"absolute",top:8,right:8,zIndex:6,background:C.gold,color:C.black,border:"none",borderRadius:"50%",width:28,height:28,fontSize:13,cursor:"pointer"},
-  hofPhotoWrap:{width:110,height:110,borderRadius:"50%",overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",marginTop:20,marginBottom:14,border:`3px solid ${C.gold}`},
+  hofPhotoWrap:{width:110,height:110,aspectRatio:"1 / 1",borderRadius:14,overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",marginTop:20,marginBottom:14,border:`3px solid ${C.gold}`},
   hofPhotoImg:{width:"100%",height:"100%",objectFit:"cover"},
   hofPhotoEmpty:{fontSize:42,opacity:0.4},
+  hofEditSection:{border:"1px solid #e0d8c8",borderRadius:10,padding:"12px 14px",marginTop:6,background:"rgba(255,255,255,0.5)"},
+  hofEditSectionTitle:{fontWeight:700,fontSize:13.5,color:C.navy,marginBottom:10,fontFamily:"Georgia,serif"},
+  hofEditPhotoPreview:{width:64,height:64,minWidth:64,aspectRatio:"1 / 1",borderRadius:10,overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.gold}`},
+  hofEditPhotoImg:{width:"100%",height:"100%",objectFit:"cover"},
   hofJabatan:{fontSize:11,letterSpacing:2,color:C.red,fontWeight:700,textTransform:"uppercase"},
   hofPeriodeSmall:{fontSize:12,color:C.muted,fontStyle:"italic",marginBottom:10},
   hofNama:{fontFamily:"Georgia,serif",fontSize:22,fontWeight:700,color:C.navy,textAlign:"center",lineHeight:1.2},
@@ -1866,17 +1928,19 @@ const S = {
   hofBackSub:{fontSize:11,letterSpacing:2,color:"rgba(255,255,255,0.75)",marginTop:2,marginBottom:20,textTransform:"uppercase"},
   hofBackBadge:{width:70,height:70,borderRadius:"50%",background:C.white,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.gold}`},
   hofBackBadgeImg:{width:52,height:52,objectFit:"contain"},
+  hofBackFullImg:{width:"100%",height:"100%",objectFit:"cover"},
   hofDots:{display:"flex",justifyContent:"center",gap:8,marginTop:6,flexWrap:"wrap",maxWidth:360,marginLeft:"auto",marginRight:"auto"},
   hofDot:{fontSize:13,color:"rgba(140,46,51,0.25)"},
   hofDotActive:{color:C.red},
   hofQuoteBar:{background:C.black,marginTop:26,padding:"30px 24px",textAlign:"center",borderRadius:8},
   hofQuoteText:{fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:"clamp(14px,2.2vw,18px)",color:C.gold,maxWidth:600,margin:"0 auto",lineHeight:1.6},
   hofKabinetSection:{padding:"36px 20px 70px",maxWidth:800,margin:"0 auto"},
-  hofKabinetList:{display:"flex",flexDirection:"column",gap:18},
-  hofKabinetItem:{background:C.white,border:"1px solid #e0d8c8",borderRadius:10,padding:"20px 16px",textAlign:"center"},
-  hofKabinetLogoWrap:{width:70,height:70,borderRadius:"50%",background:C.offwhite,margin:"0 auto 10px",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",border:"1px solid #e0d8c8"},
-  hofKabinetLogoImg:{width:52,height:52,objectFit:"contain"},
-  hofKabinetLogoEmpty:{fontSize:28,opacity:0.4},
+  hofKabinetList:{display:"flex",flexDirection:"column",gap:16,maxWidth:460,margin:"0 auto"},
+  hofKabinetItem:{position:"relative",background:C.offwhite,border:"1px solid rgba(182,138,61,0.4)",borderRadius:16,padding:"18px 20px",display:"flex",alignItems:"center",gap:16,textAlign:"left",boxShadow:"0 10px 30px rgba(0,0,0,0.12)"},
+  hofKabinetLogoWrap:{width:84,height:84,minWidth:84,aspectRatio:"1 / 1",borderRadius:14,background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",border:`3px solid ${C.gold}`,overflow:"hidden"},
+  hofKabinetLogoImg:{width:"78%",height:"78%",objectFit:"contain"},
+  hofKabinetLogoEmpty:{fontSize:30,opacity:0.4},
+  hofKabinetInfo:{flex:1,cursor:"pointer"},
   hofKabinetName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:17,color:C.navy},
   hofKabinetPeriode:{fontSize:12.5,color:C.muted,fontStyle:"italic",marginTop:2},
   hofKabinetModalBadge:{width:90,height:90,margin:"0 auto 4px",display:"flex",alignItems:"center",justifyContent:"center"},
