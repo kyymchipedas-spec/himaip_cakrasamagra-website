@@ -2,19 +2,72 @@ import React, { useState, useEffect, useRef } from "react";
 
 const SUPABASE_URL = "https://vwhfzqbpqrxonswzjbft.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3aGZ6cWJwcXJ4b25zd3pqYmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MTg4ODAsImV4cCI6MjA5ODQ5NDg4MH0.gyWUpVWyTaQL5Tr3lR5N1YxfjEak2IKci4pwkMPnBtM";
-const ADMIN_CODE = "himaip2026";
+const SESSION_KEY = "himaip_admin_session";
+
+async function rpcCall(fn, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: authHeaders(true),
+    body: JSON.stringify(body || {})
+  });
+  if (!res.ok) throw new Error("Gagal menghubungi server");
+  return res.json();
+}
+
+// --- Sesi admin (diisi lewat Supabase Auth, bukan kode statis lagi) ---
+let currentSession = null;
+
+function saveSession(data) {
+  currentSession = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in || 3600) * 1000, user: data.user };
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession)); } catch(e) {}
+}
+function clearSession() {
+  currentSession = null;
+  try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+}
+function authHeaders(json) {
+  const token = currentSession?.access_token || SUPABASE_KEY;
+  const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` };
+  if (json) h["Content-Type"] = "application/json";
+  return h;
+}
+async function authSignIn(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "Email atau password salah.");
+  return data;
+}
+async function authRefresh(refresh_token) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error("Sesi kedaluwarsa");
+  return data;
+}
+async function authSignOut() {
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/logout`, { method: "POST", headers: authHeaders() });
+  } catch(e) {}
+}
 
 const db = {
   async get(table, query = "") {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?order=created_at.desc${query}`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      headers: authHeaders()
     });
     return res.json();
   },
   async insert(table, data) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      headers: { ...authHeaders(true), Prefer: "return=representation" },
       body: JSON.stringify(data)
     });
     return res.json();
@@ -22,13 +75,13 @@ const db = {
   async delete(table, id) {
     await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
       method: "DELETE",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      headers: authHeaders()
     });
   },
   async update(table, id, data) {
     await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
       method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+      headers: authHeaders(true),
       body: JSON.stringify(data)
     });
   }
@@ -78,7 +131,15 @@ export default function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [codeInput, setCodeInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [showPinLock, setShowPinLock] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [pinStage, setPinStage] = useState("enter");
+  const [pinFirstEntry, setPinFirstEntry] = useState("");
+  const [pinError, setPinError] = useState("");
   const [activeEvent, setActiveEvent] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -105,7 +166,32 @@ export default function App() {
   const [newAnnounceDate, setNewAnnounceDate] = useState("");
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (saved.expires_at > Date.now() + 30000) {
+          currentSession = saved;
+          try {
+            const isSet = await rpcCall("pin_is_set");
+            if (isSet) setShowPinLock(true); else setIsAdmin(true);
+          } catch(e) { setIsAdmin(true); }
+        } else if (saved.refresh_token) {
+          const refreshed = await authRefresh(saved.refresh_token);
+          saveSession(refreshed);
+          try {
+            const isSet = await rpcCall("pin_is_set");
+            if (isSet) setShowPinLock(true); else setIsAdmin(true);
+          } catch(e) { setIsAdmin(true); }
+        } else {
+          clearSession();
+        }
+      } catch(e) { clearSession(); }
+    })();
+    loadAll();
+  }, []);
 
   // --- Navigasi history browser (supaya tombol kembali HP tidak langsung keluar dari web) ---
   useEffect(() => {
@@ -149,10 +235,74 @@ export default function App() {
     setLoading(false);
   }
 
-  function tryLogin() {
-    if (codeInput === ADMIN_CODE) { setIsAdmin(true); setShowLogin(false); setCodeInput(""); setLoginError(""); setShowWelcome(true); }
-    else setLoginError("Kode salah. Coba lagi.");
+  async function tryLogin() {
+    setLoginError(""); setLoggingIn(true);
+    try {
+      const data = await authSignIn(emailInput.trim(), codeInput);
+      saveSession(data);
+      setIsAdmin(true); setShowLogin(false); setCodeInput(""); setEmailInput(""); setShowWelcome(true);
+    } catch(e) {
+      setLoginError("Email atau password salah.");
+    }
+    setLoggingIn(false);
   }
+  async function doLogout() {
+    await authSignOut();
+    clearSession();
+    setIsAdmin(false);
+    setShowLogoutConfirm(false);
+  }
+  async function handlePinLockDigit(d) {
+    const next = (pinValue + d).slice(0, 6);
+    setPinValue(next);
+    setPinError("");
+    if (next.length === 6) {
+      try {
+        const ok = await rpcCall("verify_admin_pin", { input_pin: next });
+        if (ok) {
+          setShowPinLock(false); setPinValue(""); setIsAdmin(true);
+        } else {
+          setPinError("PIN salah, coba lagi.");
+          setTimeout(() => setPinValue(""), 400);
+        }
+      } catch(e) {
+        setPinError("Gagal memeriksa PIN, coba lagi.");
+        setTimeout(() => setPinValue(""), 400);
+      }
+    }
+  }
+  function forgotPin() {
+    clearSession();
+    setShowPinLock(false); setPinValue(""); setPinError("");
+    setShowLogin(true);
+  }
+  async function handlePinSetupDigit(d) {
+    const next = (pinValue + d).slice(0, 6);
+    setPinValue(next);
+    setPinError("");
+    if (next.length === 6) {
+      if (pinStage === "enter") {
+        setPinFirstEntry(next);
+        setPinStage("confirm");
+        setPinValue("");
+      } else {
+        if (next === pinFirstEntry) {
+          try {
+            await rpcCall("set_admin_pin", { new_pin: next });
+            setShowPinSetup(false); setPinValue(""); setPinFirstEntry(""); setPinStage("enter");
+          } catch(e) {
+            setPinError("Gagal menyimpan PIN ke server, coba lagi.");
+            setTimeout(() => { setPinValue(""); setPinStage("enter"); setPinFirstEntry(""); }, 800);
+          }
+        } else {
+          setPinError("PIN tidak sama, ulangi dari awal.");
+          setTimeout(() => { setPinValue(""); setPinStage("enter"); setPinFirstEntry(""); }, 600);
+        }
+      }
+    }
+  }
+  function skipPinSetup() { setShowPinSetup(false); setPinValue(""); setPinFirstEntry(""); setPinStage("enter"); }
+  function openChangePin() { setPinStage("enter"); setPinValue(""); setPinFirstEntry(""); setPinError(""); setShowPinSetup(true); }
   function navigate(t) {
     setTab(t); setMenuOpen(false); setActiveEvent(null); setActiveFolder(null);
     window.history.pushState({ tab: t, activeEvent: null, activeFolder: null }, "");
@@ -316,6 +466,7 @@ export default function App() {
           <button style={S.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
             <span style={S.bar}/><span style={S.bar}/><span style={S.bar}/>
           </button>
+          {isAdmin && <button style={{...S.adminBtnHeader,background:C.navy,marginRight:8}} onClick={openChangePin}>Ganti PIN</button>}
           <button style={S.adminBtnHeader} onClick={() => isAdmin ? setShowLogoutConfirm(true) : setShowLogin(true)}>
             {isAdmin ? "Keluar Admin" : "Masuk Admin"}
           </button>
@@ -340,13 +491,14 @@ export default function App() {
         <div style={S.modalOverlay} onClick={() => setShowLogin(false)}>
           <div style={S.modalBox} onClick={e => e.stopPropagation()}>
             <div style={S.modalTitle}>Akses Admin</div>
+            <input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)} placeholder="Email admin" style={{...S.input,marginBottom:10}} autoFocus />
             <div style={{position:"relative"}}>
-              <input type={showPass ? "text" : "password"} value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={e => e.key==="Enter" && tryLogin()} placeholder="Kode admin" style={{...S.input, paddingRight:44}} autoFocus />
+              <input type={showPass ? "text" : "password"} value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={e => e.key==="Enter" && tryLogin()} placeholder="Password" style={{...S.input, paddingRight:44}} />
               <button type="button" onClick={() => setShowPass(p => !p)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:18,opacity:0.6}}>{showPass ? "🙈" : "👁️"}</button>
             </div>
             {loginError && <div style={S.errorText}>{loginError}</div>}
             <div style={{display:"flex",gap:10,marginTop:14}}>
-              <button onClick={tryLogin} style={S.primaryBtn}>Masuk</button>
+              <button onClick={tryLogin} style={S.primaryBtn} disabled={loggingIn}>{loggingIn ? "Memeriksa…" : "Masuk"}</button>
               <button onClick={() => setShowLogin(false)} style={S.ghostBtn}>Batal</button>
             </div>
           </div>
@@ -360,7 +512,31 @@ export default function App() {
             <div style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:20,color:C.navy,marginBottom:10}}>SELAMAT!</div>
             <div style={{fontWeight:700,fontSize:14,color:C.red,letterSpacing:1,marginBottom:16}}>ANDA SEKARANG MEMILIKI AKSES ADMIN</div>
             <p style={{fontSize:13,color:C.muted,marginBottom:20}}>Kamu bisa menambah kegiatan, upload foto, dan kelola LPJ sekarang.</p>
-            <button onClick={() => setShowWelcome(false)} style={S.primaryBtn}>Siap! 🚀</button>
+            <button onClick={async () => { setShowWelcome(false); try { const isSet = await rpcCall("pin_is_set"); if (!isSet) { setPinStage("enter"); setPinValue(""); setPinFirstEntry(""); setShowPinSetup(true); } } catch(e) {} }} style={S.primaryBtn}>Siap! 🚀</button>
+          </div>
+        </div>
+      )}
+
+      {showPinLock && (
+        <div style={S.modalOverlay}>
+          <div style={{...S.modalBox,textAlign:"center"}} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:36,marginBottom:6}}>🔒</div>
+            <div style={S.modalTitle}>Masukkan PIN</div>
+            <p style={{fontSize:12.5,color:C.muted,marginBottom:18}}>Masukkan PIN 6 digit untuk membuka mode admin di perangkat ini.</p>
+            <PinPad value={pinValue} error={pinError} onDigit={handlePinLockDigit} onBackspace={() => setPinValue(v => v.slice(0,-1))} />
+            <button onClick={forgotPin} style={{...S.ghostBtn,marginTop:22,width:"100%"}}>Lupa PIN? Login ulang</button>
+          </div>
+        </div>
+      )}
+
+      {showPinSetup && (
+        <div style={S.modalOverlay}>
+          <div style={{...S.modalBox,textAlign:"center"}} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:36,marginBottom:6}}>🔢</div>
+            <div style={S.modalTitle}>{pinStage === "enter" ? "Buat PIN Admin" : "Konfirmasi PIN"}</div>
+            <p style={{fontSize:12.5,color:C.muted,marginBottom:18}}>{pinStage === "enter" ? "Buat PIN 6 digit supaya lebih cepat masuk mode admin di perangkat ini." : "Ketik ulang PIN yang sama untuk konfirmasi."}</p>
+            <PinPad value={pinValue} error={pinError} onDigit={handlePinSetupDigit} onBackspace={() => setPinValue(v => v.slice(0,-1))} />
+            <button onClick={skipPinSetup} style={{...S.ghostBtn,marginTop:22,width:"100%"}}>Lewati, tanya lagi nanti</button>
           </div>
         </div>
       )}
@@ -372,7 +548,7 @@ export default function App() {
             <div style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:18,color:C.navy,marginBottom:12}}>APA ANDA YAKIN INGIN KELUAR DARI MODE ADMIN?</div>
             <p style={{fontSize:13,color:C.muted,marginBottom:20}}>Setelah keluar, kamu tidak bisa upload atau hapus konten sampai masuk lagi.</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={() => { setIsAdmin(false); setShowLogoutConfirm(false); }} style={S.primaryBtn}>Ya, Keluar</button>
+              <button onClick={doLogout} style={S.primaryBtn}>Ya, Keluar</button>
               <button onClick={() => setShowLogoutConfirm(false)} style={S.ghostBtn}>Batal</button>
             </div>
           </div>
@@ -686,7 +862,7 @@ export default function App() {
       {tab === "tentang" && (
         <>
           <div style={S.tentangHero}>
-            <img src="/foto-hero-tentang.png" alt="" style={S.tentangHeroImg} onError={e => e.target.style.display="none"} />
+            <img src="/foto-hero-tentang.jpg" alt="" style={S.tentangHeroImg} onError={e => e.target.style.display="none"} />
             <div style={S.tentangHeroOverlay} />
             <div style={S.tentangHeroContent}>
               <img src="/logo-hima-ip.png" alt="Logo HIMA IP" style={S.tentangHeroLogo} onError={e => e.target.style.display="none"} />
@@ -743,7 +919,7 @@ export default function App() {
                 <div>
                   <h3 style={S.darkPanelTitle}>Landasan Organisasi</h3>
                   {[
-                    [<IconGaruda key="g" />, "Landasan IdiiI", "Pancasila"],
+                    [<IconGaruda key="g" />, "Landasan Idiil", "Pancasila"],
                     [<IconBook key="b" />, "Landasan Konstitusional", "UUD Negara Republik Indonesia tahun 1945"],
                     [<IconDoc key="d" />, "Landasan Operasional", "Berpedoman pada peraturan organisasi kemahasiswaan yang berlaku di STISIP Tasikmalaya"],
                   ].map(([icon,title,desc]) => (
@@ -935,6 +1111,28 @@ export default function App() {
   );
 }
 
+function PinPad({ value, onDigit, onBackspace, error }) {
+  const dots = [0,1,2,3,4,5];
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{display:"flex",gap:12,marginBottom:22}}>
+        {dots.map(i => (
+          <div key={i} style={{width:14,height:14,borderRadius:"50%",background:i < value.length ? "#1B2A45" : "transparent",border:"2px solid #1B2A45"}} />
+        ))}
+      </div>
+      {error && <div style={{color:"#8C2E33",fontSize:13,marginBottom:10,fontWeight:600}}>{error}</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3, 62px)",gap:14}}>
+        {[1,2,3,4,5,6,7,8,9].map(n => (
+          <button key={n} onClick={() => onDigit(String(n))} style={{width:62,height:62,borderRadius:"50%",border:"1px solid #ddd3bd",background:"#FAF7F2",fontSize:22,fontWeight:600,color:"#1B2A45",cursor:"pointer"}}>{n}</button>
+        ))}
+        <div />
+        <button onClick={() => onDigit("0")} style={{width:62,height:62,borderRadius:"50%",border:"1px solid #ddd3bd",background:"#FAF7F2",fontSize:22,fontWeight:600,color:"#1B2A45",cursor:"pointer"}}>0</button>
+        <button onClick={onBackspace} style={{width:62,height:62,borderRadius:"50%",border:"none",background:"none",fontSize:20,cursor:"pointer",color:"#8C2E33"}}>⌫</button>
+      </div>
+    </div>
+  );
+}
+
 function SectionHeader({ eyebrow, title, light }) {
   return (
     <div style={{marginBottom:24}}>
@@ -960,6 +1158,7 @@ function DocIcon() {
     </svg>
   );
 }
+
 function IconHistory() {
   return (
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6">
