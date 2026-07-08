@@ -1791,10 +1791,9 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
           ax: (Math.random() - 0.5) * w * 0.92,
           ay: (Math.random() - 0.5) * h * 0.92,
           az: (Math.random() - 0.5) * Math.min(w, h) * 0.3,
-          amp: Math.min(w, h) * (0.03 + Math.random() * 0.05),
-          freqX: 0.15 + Math.random() * 0.25,
-          freqY: 0.12 + Math.random() * 0.25,
-          phase: Math.random() * Math.PI * 2,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          vz: (Math.random() - 0.5) * 0.25,
           speed: 0.03 + Math.random() * 0.06,
           r: 210 + Math.random() * 35, g: 185 + Math.random() * 35, b: 120 + Math.random() * 50
         });
@@ -1837,9 +1836,12 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
       const col = geometry.attributes.color.array;
       const hasShape = targets && targets.length;
 
-      // rotasi lembut hanya saat idle (biar logo tetap jelas terbaca saat ditekan)
-      rotYRef.current += hasShape ? (0 - rotYRef.current) * 0.08 : 0.0022;
+      // kotak selalu diam (tidak muter); posisi tegak baik saat idle maupun saat logo ditekan
+      rotYRef.current += (0 - rotYRef.current) * 0.08;
       points.rotation.y = rotYRef.current;
+
+      const { w: boxW, h: boxH } = sizeRef.current;
+      const boundX = boxW * 0.46, boundY = boxH * 0.46, boundZ = Math.min(boxW, boxH) * 0.15;
 
       for (let i = 0; i < N; i++) {
         const idl = d.idle[i];
@@ -1851,9 +1853,24 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
           tx = tp.x; ty = tp.y; tz = tp.z + jitter;
           tr = tp.r; tg = tp.g; tb = tp.b;
         } else {
-          tx = idl.ax + Math.sin(t * idl.freqX + idl.phase) * idl.amp;
-          ty = idl.ay + Math.cos(t * idl.freqY + idl.phase) * idl.amp;
-          tz = idl.az;
+          // gerak melayang acak: anchor berjalan dengan kecepatan sendiri,
+          // sesekali belok arah secara acak, dan memantul saat kena batas kotak
+          idl.ax += idl.vx;
+          idl.ay += idl.vy;
+          idl.az += idl.vz;
+          if (Math.random() < 0.01) {
+            idl.vx += (Math.random() - 0.5) * 0.35;
+            idl.vy += (Math.random() - 0.5) * 0.35;
+            idl.vz += (Math.random() - 0.5) * 0.18;
+            const maxV = 0.65;
+            idl.vx = Math.max(-maxV, Math.min(maxV, idl.vx));
+            idl.vy = Math.max(-maxV, Math.min(maxV, idl.vy));
+            idl.vz = Math.max(-maxV, Math.min(maxV, idl.vz));
+          }
+          if (idl.ax > boundX || idl.ax < -boundX) idl.vx *= -1;
+          if (idl.ay > boundY || idl.ay < -boundY) idl.vy *= -1;
+          if (idl.az > boundZ || idl.az < -boundZ) idl.vz *= -1;
+          tx = idl.ax; ty = idl.ay; tz = idl.az;
           tr = idl.r; tg = idl.g; tb = idl.b;
         }
         const sp = idl.speed;
@@ -2314,7 +2331,7 @@ const S = {
   // ===== HOF v2: particle intro =====
   hofIntroWrap:{maxWidth:640,margin:"10px auto 0",padding:"0 16px"},
   hofGlassBox:{position:"relative",borderRadius:18,overflow:"hidden",background:"radial-gradient(circle at 30% 20%, #1b1440 0%, #0a0a1f 60%, #000 100%)",border:"1px solid rgba(182,138,61,0.45)",boxShadow:"0 20px 50px rgba(0,0,0,0.5), inset 0 0 40px rgba(182,138,61,0.08)",backdropFilter:"blur(2px)"},
-  hofParticleCanvas:{display:"block",width:"100%",aspectRatio:"3 / 4"},
+  hofParticleCanvas:{display:"block",width:"100%",aspectRatio:"4 / 3"},
   hofMarqueeOuter:{marginTop:14,overflow:"hidden",background:"rgba(10,10,20,0.9)",border:"1px solid rgba(182,138,61,0.35)",borderRadius:12,padding:"10px 0"},
   hofMarqueeLogo:{width:64,height:64,minWidth:64,margin:"0 10px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(182,138,61,0.3)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",touchAction:"none",WebkitTouchCallout:"none",WebkitUserSelect:"none",userSelect:"none"},
   hofMarqueeLogoImg:{width:"70%",height:"70%",objectFit:"contain",pointerEvents:"none"},
