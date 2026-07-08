@@ -153,6 +153,22 @@ const LEADERSHIP_QUOTES = [
   "Pemimpin yang rendah hati akan selalu punya ruang untuk belajar."
 ];
 
+// Quotes singkat yang muncul di overlay setiap kali berpindah halaman
+const PAGE_TRANSITION_QUOTES = [
+  "Setiap langkah kecil hari ini adalah jejak sejarah HIMA IP esok hari.",
+  "Kebersamaan adalah kekuatan yang tak pernah usang oleh waktu.",
+  "Ilmu Pemerintahan bukan sekadar jurusan, tapi panggilan untuk melayani.",
+  "Organisasi hebat lahir dari mahasiswa yang mau berproses, bukan yang menuntut hasil instan.",
+  "Cakra Samagra: satu roda, satu arah, satu tujuan bersama.",
+  "Yang diingat bukan siapa yang paling banyak bicara, tapi siapa yang paling banyak berkarya.",
+  "Sejarah HIMA IP ditulis oleh mereka yang hadir, bukan yang hanya menonton.",
+  "Kolaborasi selalu mengalahkan ambisi yang berjalan sendiri.",
+  "Rumah ini dibangun dari keringat, diskusi panjang, dan mimpi yang sama.",
+  "Integritas adalah warisan yang tidak akan pernah pudar oleh pergantian kepengurusan.",
+  "Mahasiswa yang baik adalah yang pulang membawa perubahan, bukan sekadar gelar.",
+  "Setiap kegiatan kecil adalah investasi besar untuk masa depan organisasi.",
+];
+
 export default function App() {
   const [tab, setTab] = useState("beranda");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -164,6 +180,8 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [siteIntro, setSiteIntro] = useState(true);
+  const [pageTransition, setPageTransition] = useState(null); // { quote, theme } saat overlay perpindahan halaman aktif
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [codeInput, setCodeInput] = useState("");
@@ -194,6 +212,9 @@ export default function App() {
   const memberPhotoRef = useRef(null);
   const editMemberPhotoRef = useRef(null);
   const contentRef = useRef(null);
+  const siteIntroTimer = useRef(null);
+  const pageTransitionHoldTimer = useRef(null);
+  const pageTransitionSwapTimer = useRef(null);
   const announceRef = useRef(null);
   const announceFileRef = useRef(null);
   const editAnnounceFileRef = useRef(null);
@@ -217,7 +238,7 @@ export default function App() {
   const [hofActiveSection, setHofActiveSection] = useState("intro");
   const [hofQuoteOverlay, setHofQuoteOverlay] = useState(null);
   const [hofPressedLogo, setHofPressedLogo] = useState(null);
-  const [hofShowIdentity, setHofShowIdentity] = useState(false);
+  const [hofIdentityPopup, setHofIdentityPopup] = useState(null);
   const [hofLeaderFilter, setHofLeaderFilter] = useState("semua");
   const [hofExpandedCard, setHofExpandedCard] = useState(null);
   const hofTouchX = useRef(null);
@@ -236,7 +257,7 @@ export default function App() {
     const results = [];
     events.forEach(ev => {
       if ((ev.name||"").toLowerCase().includes(q) || (ev.description||"").toLowerCase().includes(q)) {
-        results.push({ key:"ev_"+ev.id, type:"Kegiatan", label: ev.name, onClick: () => { navigate("galeri"); setTimeout(() => openEvent(ev.id), 50); } });
+        results.push({ key:"ev_"+ev.id, type:"Kegiatan", label: ev.name, onClick: () => { navigate("galeri"); setTimeout(() => openEvent(ev.id), 420); } });
       }
     });
     members.forEach(m => {
@@ -246,17 +267,17 @@ export default function App() {
     });
     announcements.forEach(a => {
       if ((a.title||"").toLowerCase().includes(q)) {
-        results.push({ key:"a_"+a.id, type:"Pengumuman", label: a.title, onClick: () => { navigate("beranda"); setTimeout(scrollToAnnounce, 300); } });
+        results.push({ key:"a_"+a.id, type:"Pengumuman", label: a.title, onClick: () => { navigate("beranda"); setTimeout(scrollToAnnounce, 550); } });
       }
     });
     lpjDocs.forEach(d => {
       if ((d.title||"").toLowerCase().includes(q) || (d.name||"").toLowerCase().includes(q)) {
-        results.push({ key:"d_"+d.id, type:"Berkas", label: d.title || d.name, onClick: () => { navigate("lpj"); if (d.folder_id) setTimeout(() => openFolder(d.folder_id), 50); } });
+        results.push({ key:"d_"+d.id, type:"Berkas", label: d.title || d.name, onClick: () => { navigate("lpj"); if (d.folder_id) setTimeout(() => openFolder(d.folder_id), 420); } });
       }
     });
     berkasFolders.forEach(f => {
       if ((f.name||"").toLowerCase().includes(q)) {
-        results.push({ key:"f_"+f.id, type:"Folder", label: f.name, onClick: () => { navigate("lpj"); setTimeout(() => openFolder(f.id), 50); } });
+        results.push({ key:"f_"+f.id, type:"Folder", label: f.name, onClick: () => { navigate("lpj"); setTimeout(() => openFolder(f.id), 420); } });
       }
     });
     return results.slice(0, 20);
@@ -267,6 +288,18 @@ export default function App() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Animasi selamat datang saat pertama kali membuka website (2 detik, lalu masuk ke Beranda)
+  useEffect(() => {
+    siteIntroTimer.current = setTimeout(() => setSiteIntro(false), 2200);
+    return () => clearTimeout(siteIntroTimer.current);
+  }, []);
+
+  // Kunci scroll body saat overlay welcome / transisi halaman sedang tampil
+  useEffect(() => {
+    document.body.style.overflow = (siteIntro || pageTransition) ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [siteIntro, pageTransition]);
 
   // Track which HOF section is active (for dot nav) while on the hof tab
   useEffect(() => {
@@ -340,10 +373,12 @@ export default function App() {
     window.history.replaceState({ tab: "beranda", activeEvent: null, activeFolder: null }, "");
     function handlePopState(e) {
       const st = e.state || { tab: "beranda", activeEvent: null, activeFolder: null };
-      setTab(st.tab || "beranda");
-      setActiveEvent(st.activeEvent || null);
-      setActiveFolder(st.activeFolder || null);
-      setMenuOpen(false);
+      triggerPageTransition(st.tab || "beranda", () => {
+        setTab(st.tab || "beranda");
+        setActiveEvent(st.activeEvent || null);
+        setActiveFolder(st.activeFolder || null);
+        setMenuOpen(false);
+      });
     }
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -451,10 +486,29 @@ export default function App() {
   }
   function skipPinSetup() { setShowPinSetup(false); setPinValue(""); setPinFirstEntry(""); setPinStage("enter"); }
   function openChangePin() { setPinStage("enter"); setPinValue(""); setPinFirstEntry(""); setPinError(""); setShowPinSetup(true); }
+  // Menampilkan overlay quote (2 detik, latar menyesuaikan halaman tujuan) sebelum konten halaman diganti,
+  // supaya perpindahan halaman terasa smooth dan tertutup rapi tanpa "kedip" konten lama/baru.
+  function triggerPageTransition(targetTab, applyChange) {
+    clearTimeout(pageTransitionSwapTimer.current);
+    clearTimeout(pageTransitionHoldTimer.current);
+    const quote = PAGE_TRANSITION_QUOTES[Math.floor(Math.random() * PAGE_TRANSITION_QUOTES.length)];
+    const theme = targetTab === "hof" ? "dark" : "light";
+    setPageTransition({ quote, theme });
+    pageTransitionSwapTimer.current = setTimeout(() => {
+      applyChange();
+      window.scrollTo(0, 0);
+    }, 360);
+    pageTransitionHoldTimer.current = setTimeout(() => {
+      setPageTransition(null);
+    }, 2000);
+  }
   function navigate(t) {
-    setTab(t); setMenuOpen(false); setActiveEvent(null); setActiveFolder(null);
-    window.history.pushState({ tab: t, activeEvent: null, activeFolder: null }, "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMenuOpen(false);
+    if (t === tab && !activeEvent && !activeFolder) return;
+    triggerPageTransition(t, () => {
+      setTab(t); setActiveEvent(null); setActiveFolder(null);
+      window.history.pushState({ tab: t, activeEvent: null, activeFolder: null }, "");
+    });
   }
   function openEvent(id) {
     setActiveEvent(id);
@@ -700,17 +754,18 @@ export default function App() {
   }
   const hofJourneySorted = React.useMemo(() => [...hofJourney].sort((a, b) => (a.urutan || 0) - (b.urutan || 0)), [hofJourney]);
 
-  // Press & hold a kabinet logo: after 5s, reveal its identity (name, filosofi, periode)
+  // Press & hold a kabinet logo: after 5s, open identity popup (name, filosofi, periode, logo)
   function hofLogoPressStart(kab) {
     setHofPressedLogo(kab);
-    setHofShowIdentity(false);
     clearTimeout(hofHoldTimer.current);
-    hofHoldTimer.current = setTimeout(() => setHofShowIdentity(true), 5000);
+    hofHoldTimer.current = setTimeout(() => {
+      setHofIdentityPopup(kab);
+    }, 5000);
   }
   function hofLogoPressEnd() {
     clearTimeout(hofHoldTimer.current);
     setHofPressedLogo(null);
-    setHofShowIdentity(false);
+    // popup identitas TIDAK ditutup di sini — biarkan terbuka sampai user tap tombol ✕
   }
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
@@ -720,8 +775,16 @@ export default function App() {
   return (
     <div style={S.page}>
       <style>{`
-        @keyframes pageFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .page-fade-wrap { animation: pageFadeIn 0.4s ease; }
+        @keyframes pageFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .page-fade-wrap { animation: pageFadeIn 0.75s cubic-bezier(0.4,0,0.2,1); }
+        @keyframes siteIntroFade { 0% { opacity:0; } 12% { opacity:1; } 78% { opacity:1; } 100% { opacity:0; } }
+        .site-intro-anim { animation: siteIntroFade 2.2s ease forwards; }
+        @keyframes siteIntroTextIn { from { opacity:0; transform:translateY(14px); letter-spacing:2px; } to { opacity:1; transform:translateY(0); letter-spacing:1px; } }
+        .site-intro-text-anim { animation: siteIntroTextIn 1s cubic-bezier(0.4,0,0.2,1) both; }
+        @keyframes pageTransitionFade { 0% { opacity:0; } 15% { opacity:1; } 85% { opacity:1; } 100% { opacity:0; } }
+        .page-transition-anim { animation: pageTransitionFade 2s ease forwards; }
+        @keyframes pageTransitionTextIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .page-transition-text-anim { animation: pageTransitionTextIn 0.8s cubic-bezier(0.4,0,0.2,1) 0.25s both; }
         .music-link { color:#1DB954; font-weight:600; text-decoration:none; cursor:pointer; max-width:190px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; transition:color 0.15s ease; }
         .music-link:hover { color:#2FE271; text-decoration:underline; }
         @keyframes hofSlideNext { from { opacity:0; transform:translateX(50px) scale(0.96); } to { opacity:1; transform:translateX(0) scale(1); } }
@@ -733,6 +796,25 @@ export default function App() {
         @keyframes hofQuoteFade { 0% { opacity:0; } 12% { opacity:1; } 88% { opacity:1; } 100% { opacity:0; } }
         .hof-quote-anim { animation: hofQuoteFade 3s ease; }
       `}</style>
+
+      {siteIntro && (
+        <div style={S.siteIntroOverlay} className="site-intro-anim">
+          <div style={S.siteIntroText} className="site-intro-text-anim">
+            Welcome to HIMA IP STISIP Tasikmalaya website
+          </div>
+        </div>
+      )}
+
+      {pageTransition && (
+        <div
+          key={pageTransition.quote}
+          style={pageTransition.theme === "dark" ? S.pageTransitionOverlayDark : S.pageTransitionOverlayLight}
+          className="page-transition-anim"
+        >
+          <div style={S.pageTransitionQuote} className="page-transition-text-anim">"{pageTransition.quote}"</div>
+        </div>
+      )}
+
       <header style={S.header}>
         <div style={S.headerLeft}>
           <button style={S.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
@@ -1078,6 +1160,21 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {hofIdentityPopup && (
+        <div style={S.hofExpandOverlay}>
+          <div style={S.hofExpandPanel} onClick={e => e.stopPropagation()}>
+            <button style={S.hofExpandClose} onClick={() => setHofIdentityPopup(null)}>✕</button>
+            <div style={S.hofExpandPhotoWrap}>
+              {hofIdentityPopup.logo ? <img src={hofIdentityPopup.logo} alt="" style={{...S.hofExpandPhotoImg,objectFit:"contain",background:"#fff"}} /> : <div style={{fontSize:60,opacity:0.3}}>🛡️</div>}
+            </div>
+            <div style={S.hofExpandName}>{hofIdentityPopup.nama_kabinet || "Nama Kabinet"}</div>
+            {hofIdentityPopup.periode && <div style={S.hofExpandRole}>Periode {hofIdentityPopup.periode}</div>}
+            <div style={{...S.hofExpandNpm,textAlign:"left",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{hofIdentityPopup.filosofi || "Filosofi kabinet belum diisi."}</div>
+          </div>
+        </div>
+      )}
+
 
       {hofQuoteOverlay && (
         <div style={S.hofQuoteOverlay} className="hof-quote-anim">
@@ -1482,7 +1579,6 @@ export default function App() {
             <HofParticleIntro
               kabinetList={hofKabinetSorted}
               pressedLogo={hofPressedLogo}
-              showIdentity={hofShowIdentity}
               onPressStart={hofLogoPressStart}
               onPressEnd={hofLogoPressEnd}
             />
@@ -1739,7 +1835,7 @@ function makeGlowTexture() {
   return tex;
 }
 
-function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart, onPressEnd }) {
+function HofParticleIntro({ kabinetList, pressedLogo, onPressStart, onPressEnd }) {
   const canvasRef = useRef(null);
   const glRef = useRef(null); // { renderer, scene, camera, points, geometry, material, texture }
   const dataRef = useRef(null); // Float32Arrays + per-particle state
@@ -1964,13 +2060,6 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
           ))}
         </div>
       </div>
-      {pressedLogo && showIdentity && (
-        <div style={S.hofIdentityCard}>
-          <div style={S.hofIdentityName}>{pressedLogo.nama_kabinet || "Nama Kabinet"}</div>
-          <div style={S.hofIdentityPeriode}>{pressedLogo.periode ? "Periode " + pressedLogo.periode : ""}</div>
-          <div style={S.hofIdentityFilosofi}>{pressedLogo.filosofi || "Filosofi kabinet belum diisi."}</div>
-        </div>
-      )}
       {kabinetList.length === 0 && (
         <div style={{ textAlign: "center", color: "#c9c2ad", fontSize: 12.5, marginTop: 10 }}>Belum ada logo kabinet. Tambahkan lewat mode admin.</div>
       )}
@@ -2269,7 +2358,7 @@ const S = {
   tentangQuoteBar:{background:C.black,borderTop:`2px solid ${C.gold}`,padding:"36px 20px",textAlign:"center",fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:"clamp(16px,3vw,24px)",fontWeight:700,color:C.gold},
 
   // ===== Hall of Fame =====
-  hofWrap:{paddingTop:58,background:C.black,minHeight:"100vh"},
+  hofWrap:{paddingTop:58,background:C.black,minHeight:"100vh",overflow:"hidden",backgroundSize:"cover",backgroundPosition:"center",backgroundAttachment:"fixed",backgroundRepeat:"no-repeat"},
   hofHeroLabel:{textAlign:"center",padding:"36px 20px 0"},
   hofHeroEyebrow:{fontSize:12,letterSpacing:3,color:C.gold,fontWeight:700,textTransform:"uppercase"},
   hofHeroTitle:{fontFamily:"Georgia,serif",fontSize:"clamp(26px,4.5vw,40px)",fontWeight:700,color:C.white,marginTop:6},
@@ -2379,6 +2468,11 @@ const S = {
   hofJourneyEditPreview:{width:110,aspectRatio:"3 / 4",margin:"0 auto",borderRadius:10,overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.gold}`},
   hofQuoteOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:40,pointerEvents:"none"},
   hofQuoteOverlayText:{color:C.gold,fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:19,textAlign:"center",lineHeight:1.6,maxWidth:340},
+  siteIntroOverlay:{position:"fixed",inset:0,background:C.black,display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:40,textAlign:"center"},
+  siteIntroText:{color:C.gold,fontFamily:"Georgia,serif",fontWeight:600,fontSize:"clamp(18px,4.2vw,30px)",letterSpacing:1,lineHeight:1.5,maxWidth:560},
+  pageTransitionOverlayDark:{position:"fixed",inset:0,background:C.black,display:"flex",alignItems:"center",justifyContent:"center",zIndex:9000,padding:40,textAlign:"center"},
+  pageTransitionOverlayLight:{position:"fixed",inset:0,background:C.offwhite,display:"flex",alignItems:"center",justifyContent:"center",zIndex:9000,padding:40,textAlign:"center"},
+  pageTransitionQuote:{color:C.gold,fontFamily:"Georgia,serif",fontStyle:"italic",fontWeight:600,fontSize:"clamp(16px,3vw,22px)",lineHeight:1.6,maxWidth:520,textShadow:"0 1px 2px rgba(0,0,0,0.15)"},
   hofKabinetModalBadge:{width:90,height:90,margin:"0 auto 4px",display:"flex",alignItems:"center",justifyContent:"center"},
   hofKabinetModalPattern:{height:14,margin:"0 -30px 18px",backgroundImage:"repeating-linear-gradient(45deg, transparent 0 6px, rgba(182,138,61,0.4) 6px 7px), repeating-linear-gradient(-45deg, transparent 0 6px, rgba(182,138,61,0.4) 6px 7px)",backgroundColor:C.red}
 };
