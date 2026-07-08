@@ -188,20 +188,26 @@ export default function App() {
   // ===== Hall of Fame =====
   const [hofKetua, setHofKetua] = useState([]);
   const [hofKabinet, setHofKabinet] = useState([]);
-  const [hofView, setHofView] = useState("ketua");
-  const [hofIndex, setHofIndex] = useState(0);
-  const [hofDir, setHofDir] = useState(1);
-  const [hofFlipped, setHofFlipped] = useState(false);
-  const [hofQuoteIdx, setHofQuoteIdx] = useState(0);
-  const [hofScrollTarget, setHofScrollTarget] = useState(null);
+  const [hofJourney, setHofJourney] = useState([]);
   const [editingKetua, setEditingKetua] = useState(null);
   const [editingKabinet, setEditingKabinet] = useState(null);
-  const [activeKabinetModal, setActiveKabinetModal] = useState(null);
+  const [editingJourney, setEditingJourney] = useState(null);
+  const [showKelolaKabinet, setShowKelolaKabinet] = useState(false);
+  const [hofActiveSection, setHofActiveSection] = useState("intro");
+  const [hofQuoteOverlay, setHofQuoteOverlay] = useState(null);
+  const [hofPressedLogo, setHofPressedLogo] = useState(null);
+  const [hofShowIdentity, setHofShowIdentity] = useState(false);
+  const [hofLeaderFilter, setHofLeaderFilter] = useState("semua");
+  const [hofExpandedCard, setHofExpandedCard] = useState(null);
   const hofTouchX = useRef(null);
   const kabinetRefs = useRef({});
   const ketuaFotoRef = useRef(null);
   const wakilFotoRef = useRef(null);
   const kabinetLogoRef = useRef(null);
+  const journeyFotoRef = useRef(null);
+  const hofSectionRefs = useRef({});
+  const hofHoldTimer = useRef(null);
+  const hofQuoteTimer = useRef(null);
 
   const searchResults = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -241,20 +247,36 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Track which HOF section is active (for dot nav) while on the hof tab
   useEffect(() => {
-    const t = setInterval(() => setHofQuoteIdx(i => (i + 1) % LEADERSHIP_QUOTES.length), 6000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    if (tab === "hof" && hofView === "kabinet" && hofScrollTarget) {
-      const el = kabinetRefs.current[hofScrollTarget];
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        setHofScrollTarget(null);
+    if (tab !== "hof") return;
+    function onScroll() {
+      const order = ["intro", "journey", "leadership"];
+      let current = "intro";
+      let best = Infinity;
+      for (const key of order) {
+        const el = hofSectionRefs.current[key];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.top - 90);
+        if (rect.top <= window.innerHeight * 0.6 && dist < best) { best = dist; current = key; }
       }
+      setHofActiveSection(current);
     }
-  }, [tab, hofView, hofScrollTarget, hofKabinet]);
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [tab]);
+
+  function hofGoToSection(key) {
+    const quote = LEADERSHIP_QUOTES[Math.floor(Math.random() * LEADERSHIP_QUOTES.length)];
+    setHofQuoteOverlay(quote);
+    clearTimeout(hofQuoteTimer.current);
+    hofQuoteTimer.current = setTimeout(() => setHofQuoteOverlay(null), 3000);
+    const el = hofSectionRefs.current[key];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setHofActiveSection(key);
+  }
 
   useEffect(() => {
     (async () => {
@@ -334,6 +356,8 @@ export default function App() {
       setHofKetua(Array.isArray(hk) ? hk : []);
       const hkab = await db.get("hof_kabinet");
       setHofKabinet(Array.isArray(hkab) ? hkab : []);
+      const hj = await db.get("hof_journey");
+      setHofJourney(Array.isArray(hj) ? hj : []);
     } catch(e) { console.error(e); }
     setLoading(false);
   }
@@ -577,7 +601,16 @@ export default function App() {
     if (!confirm("Hapus periode kepengurusan ini beserta kartu Ketua & Wakil?")) return;
     await db.delete("hof_ketua", id);
     setHofKetua(k => k.filter(x => x.id !== id));
-    setHofIndex(0); setHofFlipped(false);
+  }
+  async function moveKetuaPeriode(id, dir) {
+    const sorted = [...hofKetua].sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+    const idx = sorted.findIndex(x => x.id === id);
+    const swapIdx = idx + dir;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= sorted.length) return;
+    const a = sorted[idx], b = sorted[swapIdx];
+    const aU = a.urutan, bU = b.urutan;
+    await Promise.all([db.update("hof_ketua", a.id, { urutan: bU }), db.update("hof_ketua", b.id, { urutan: aU })]);
+    setHofKetua(k => k.map(x => x.id === a.id ? { ...x, urutan: bU } : x.id === b.id ? { ...x, urutan: aU } : x));
   }
   async function addKabinet() {
     const maxU = hofKabinet.reduce((m, k) => Math.max(m, k.urutan || 0), 0);
@@ -597,44 +630,71 @@ export default function App() {
     setHofKabinet(k => k.filter(x => x.id !== id));
   }
 
-  const hofCards = React.useMemo(() => {
+  const hofKabinetSorted = React.useMemo(() => [...hofKabinet].sort((a, b) => (b.urutan || 0) - (a.urutan || 0)), [hofKabinet]);
+
+  // Flatten Ketua/Wakil periods into individual leadership cards (one per person)
+  const hofLeaderCards = React.useMemo(() => {
     const sorted = [...hofKetua].sort((a, b) => (b.urutan || 0) - (a.urutan || 0));
     const arr = [];
-    sorted.forEach(p => { arr.push({ ...p, role: "ketua" }); arr.push({ ...p, role: "wakil" }); });
+    sorted.forEach(p => {
+      const kab = hofKabinet.find(k => k.ketua_periode === p.periode);
+      arr.push({ id: p.id + "_ketua", periode: p.id, role: "ketua", nama: p.ketua_nama, npm: p.ketua_npm, foto: p.ketua_foto, medsos: p.ketua_medsos, periodeLabel: p.periode, kabinetNama: kab ? kab.nama_kabinet : "" });
+      arr.push({ id: p.id + "_wakil", periode: p.id, role: "wakil", nama: p.wakil_nama, npm: p.wakil_npm, foto: p.wakil_foto, medsos: p.wakil_medsos, periodeLabel: p.periode, kabinetNama: kab ? kab.nama_kabinet : "" });
+    });
     return arr;
-  }, [hofKetua]);
-  const hofKabinetSorted = React.useMemo(() => [...hofKabinet].sort((a, b) => (b.urutan || 0) - (a.urutan || 0)), [hofKabinet]);
-  const hofCurrent = hofCards[hofIndex] || null;
+  }, [hofKetua, hofKabinet]);
 
-  function hofNext() {
-    if (hofFlipped) { setHofFlipped(false); return; }
-    if (hofCards.length === 0) return;
-    setHofDir(1);
-    setHofIndex(i => (i + 1) % hofCards.length);
+  const hofLeaderFiltered = React.useMemo(() => {
+    if (hofLeaderFilter === "semua") return hofLeaderCards;
+    return hofLeaderCards.filter(c => c.kabinetNama === hofLeaderFilter);
+  }, [hofLeaderCards, hofLeaderFilter]);
+
+  // Journey (HIMA IP Journey) photo CRUD
+  async function addJourneyPhoto(file) {
+    const src = await compressImage(file, 700, 0.8);
+    const maxU = hofJourney.reduce((m, j) => Math.max(m, j.urutan || 0), 0);
+    const row = { id: "hj_" + Date.now(), urutan: maxU + 1, foto: src, deskripsi: "" };
+    await db.insert("hof_journey", row);
+    setHofJourney(j => [...j, row]);
   }
-  function hofPrev() {
-    if (hofFlipped) { setHofFlipped(false); return; }
-    if (hofCards.length === 0) return;
-    setHofDir(-1);
-    setHofIndex(i => (i - 1 + hofCards.length) % hofCards.length);
+  async function saveEditJourney(id, data) {
+    await db.update("hof_journey", id, data);
+    setHofJourney(j => j.map(x => x.id === id ? { ...x, ...data } : x));
+    setEditingJourney(null);
   }
-  function hofTouchStart(e) { hofTouchX.current = e.touches[0].clientX; }
-  function hofTouchEnd(e) {
-    if (hofTouchX.current === null) return;
-    const dx = e.changedTouches[0].clientX - hofTouchX.current;
-    hofTouchX.current = null;
-    if (Math.abs(dx) < 40) return;
-    dx < 0 ? hofNext() : hofPrev();
+  async function deleteJourneyPhoto(id) {
+    if (!confirm("Hapus foto kegiatan ini?")) return;
+    await db.delete("hof_journey", id);
+    setHofJourney(j => j.filter(x => x.id !== id));
   }
-  function goToKabinet(periode) {
-    const found = hofKabinet.find(k => k.ketua_periode === periode);
-    setTab("hof"); setHofView("kabinet"); setHofScrollTarget(found ? found.id : null);
-    window.history.pushState({ tab: "hof" }, "");
+  async function moveJourneyPhoto(id, dir) {
+    const sorted = [...hofJourney].sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+    const idx = sorted.findIndex(x => x.id === id);
+    const swapIdx = idx + dir;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= sorted.length) return;
+    const a = sorted[idx], b = sorted[swapIdx];
+    const aU = a.urutan, bU = b.urutan;
+    await Promise.all([db.update("hof_journey", a.id, { urutan: bU }), db.update("hof_journey", b.id, { urutan: aU })]);
+    setHofJourney(j => j.map(x => x.id === a.id ? { ...x, urutan: bU } : x.id === b.id ? { ...x, urutan: aU } : x));
+  }
+  const hofJourneySorted = React.useMemo(() => [...hofJourney].sort((a, b) => (a.urutan || 0) - (b.urutan || 0)), [hofJourney]);
+
+  // Press & hold a kabinet logo: after 5s, reveal its identity (name, filosofi, periode)
+  function hofLogoPressStart(kab) {
+    setHofPressedLogo(kab);
+    setHofShowIdentity(false);
+    clearTimeout(hofHoldTimer.current);
+    hofHoldTimer.current = setTimeout(() => setHofShowIdentity(true), 5000);
+  }
+  function hofLogoPressEnd() {
+    clearTimeout(hofHoldTimer.current);
+    setHofPressedLogo(null);
+    setHofShowIdentity(false);
   }
 
   const totalPhotos = Object.values(photosByEvent).reduce((a, b) => a + b.length, 0);
 
-  const pageKey = tab + ":" + (activeEvent || "") + ":" + (activeFolder || "") + ":" + (tab === "hof" ? hofView : "");
+  const pageKey = tab + ":" + (activeEvent || "") + ":" + (activeFolder || "");
 
   return (
     <div style={S.page}>
@@ -647,6 +707,10 @@ export default function App() {
         @keyframes hofSlidePrev { from { opacity:0; transform:translateX(-50px) scale(0.96); } to { opacity:1; transform:translateX(0) scale(1); } }
         .hof-slide-next { animation: hofSlideNext 0.4s ease; }
         .hof-slide-prev { animation: hofSlidePrev 0.4s ease; }
+        @keyframes hofMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .hof-marquee-track { display:flex; width:max-content; animation: hofMarquee 22s linear infinite; }
+        @keyframes hofQuoteFade { 0% { opacity:0; } 12% { opacity:1; } 88% { opacity:1; } 100% { opacity:0; } }
+        .hof-quote-anim { animation: hofQuoteFade 3s ease; }
       `}</style>
       <header style={S.header}>
         <div style={S.headerLeft}>
@@ -694,7 +758,7 @@ export default function App() {
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
             <div style={S.drawerTitle}>HIMA IP</div>
-            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"]].map(([key,label]) => (
+            {[["beranda","Beranda"],["galeri","GALERI KEGIATAN"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"]].map(([key,label]) => (
               <button key={key} style={{...S.drawerItem,...(tab===key?S.drawerItemActive:{})}} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -859,6 +923,7 @@ export default function App() {
                   <button style={{...S.ghostBtn,flex:1}} onClick={() => ketuaFotoRef.current.click()}>{editingKetua.ketua_foto ? "Ganti Foto Ketua" : "Pilih Foto Ketua"}</button>
                   <button style={S.deleteLink} onClick={clearKetuaRole}>Hapus Kartu Ketua</button>
                 </div>
+                <input style={{...S.input,marginTop:10}} placeholder="Link Media Sosial Ketua (opsional)" value={editingKetua.ketua_medsos || ""} onChange={e => setEditingKetua(k => ({...k, ketua_medsos: e.target.value}))} />
               </div>
 
               <div style={S.hofEditSection}>
@@ -877,11 +942,14 @@ export default function App() {
                   <button style={{...S.ghostBtn,flex:1}} onClick={() => wakilFotoRef.current.click()}>{editingKetua.wakil_foto ? "Ganti Foto Wakil" : "Pilih Foto Wakil"}</button>
                   <button style={S.deleteLink} onClick={clearWakilRole}>Hapus Kartu Wakil</button>
                 </div>
+                <input style={{...S.input,marginTop:10}} placeholder="Link Media Sosial Wakil (opsional)" value={editingKetua.wakil_medsos || ""} onChange={e => setEditingKetua(k => ({...k, wakil_medsos: e.target.value}))} />
               </div>
             </div>
-            <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center"}}>
-              <button style={S.primaryBtn} onClick={() => saveEditKetua(editingKetua.id, {periode:editingKetua.periode, ketua_nama:editingKetua.ketua_nama, ketua_npm:editingKetua.ketua_npm, ketua_foto:editingKetua.ketua_foto, wakil_nama:editingKetua.wakil_nama, wakil_npm:editingKetua.wakil_npm, wakil_foto:editingKetua.wakil_foto})}>Simpan</button>
+            <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center",flexWrap:"wrap"}}>
+              <button style={S.primaryBtn} onClick={() => saveEditKetua(editingKetua.id, {periode:editingKetua.periode, ketua_nama:editingKetua.ketua_nama, ketua_npm:editingKetua.ketua_npm, ketua_foto:editingKetua.ketua_foto, ketua_medsos:editingKetua.ketua_medsos, wakil_nama:editingKetua.wakil_nama, wakil_npm:editingKetua.wakil_npm, wakil_foto:editingKetua.wakil_foto, wakil_medsos:editingKetua.wakil_medsos})}>Simpan</button>
               <button style={S.ghostBtn} onClick={() => setEditingKetua(null)}>Batal</button>
+              <button style={S.ghostBtn} onClick={() => moveKetuaPeriode(editingKetua.id, -1)}>↑ Naik</button>
+              <button style={S.ghostBtn} onClick={() => moveKetuaPeriode(editingKetua.id, 1)}>↓ Turun</button>
               <button style={{...S.deleteLink,marginLeft:"auto"}} onClick={() => { deleteKetuaPeriode(editingKetua.id); setEditingKetua(null); }}>Hapus Periode Ini</button>
             </div>
           </div>
@@ -917,18 +985,82 @@ export default function App() {
         </div>
       )}
 
-      {activeKabinetModal && (
-        <div style={S.modalOverlay} onClick={() => setActiveKabinetModal(null)}>
-          <div style={{...S.modalBox,maxWidth:340}} onClick={e => e.stopPropagation()}>
-            <div style={S.hofKabinetModalBadge}>
-              {activeKabinetModal.logo ? <img src={activeKabinetModal.logo} alt="" style={S.hofBackBadgeImg} /> : <div style={{fontSize:28}}>🛡️</div>}
+      {showKelolaKabinet && (
+        <div style={S.modalOverlay} onClick={() => setShowKelolaKabinet(false)}>
+          <div style={{...S.modalBox,maxWidth:460}} onClick={e => e.stopPropagation()}>
+            <div style={S.modalTitle}>Kelola Data Kabinet</div>
+            <div style={{fontSize:12.5,color:C.muted,marginBottom:14}}>Data ini jadi sumber logo marquee &amp; identitas kabinet di section pembuka Hall of Fame. Gunakan logo PNG transparan.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:14,textAlign:"left"}}>
+              {hofKabinetSorted.map(k => (
+                <div key={k.id} style={S.hofKabinetItem}>
+                  <div style={S.hofCardCorner1} />
+                  <div style={S.hofCardCorner2} />
+                  <div style={S.hofKabinetLogoWrap}>
+                    {k.logo ? <img src={k.logo} alt={k.nama_kabinet} style={S.hofKabinetLogoImg} /> : <div style={S.hofKabinetLogoEmpty}>🛡️</div>}
+                  </div>
+                  <div style={S.hofKabinetInfo}>
+                    <div style={S.hofKabinetName}>{k.nama_kabinet || "Nama Kabinet"}</div>
+                    <div style={S.hofKabinetPeriode}>{k.periode ? "Periode " + k.periode : "-"}</div>
+                    <div style={{display:"flex",gap:14,marginTop:8}}>
+                      <button style={S.deleteLink} onClick={() => setEditingKabinet(k)}>Edit</button>
+                      <button style={S.deleteLink} onClick={() => deleteKabinet(k.id)}>Hapus</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {hofKabinetSorted.length === 0 && <div style={{fontSize:13.5,color:C.muted,textAlign:"center",padding:"10px 0"}}>Belum ada data kabinet.</div>}
             </div>
-            <div style={S.hofKabinetModalPattern} />
-            <div style={S.modalTitle}>{activeKabinetModal.nama_kabinet}</div>
-            <div style={{fontSize:13,color:C.muted,fontStyle:"italic",marginBottom:14}}>{activeKabinetModal.periode ? "Periode " + activeKabinetModal.periode : ""}</div>
-            <div style={{fontSize:14,lineHeight:1.7,color:"#333",textAlign:"left",whiteSpace:"pre-wrap"}}>{activeKabinetModal.filosofi || "Filosofi kabinet belum diisi."}</div>
-            <button style={{...S.ghostBtn,marginTop:18}} onClick={() => setActiveKabinetModal(null)}>Tutup</button>
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button style={{...S.primaryBtn,flex:1}} onClick={addKabinet}>+ Tambah Kabinet</button>
+              <button style={S.ghostBtn} onClick={() => setShowKelolaKabinet(false)}>Tutup</button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {editingJourney && (
+        <div style={S.modalOverlay} onClick={() => setEditingJourney(null)}>
+          <div style={{...S.modalBox,maxWidth:400,textAlign:"left"}} onClick={e => e.stopPropagation()}>
+            <div style={S.modalTitle}>Edit Foto Kegiatan</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={S.hofJourneyEditPreview}>
+                {editingJourney.foto ? <img src={editingJourney.foto} alt="" style={S.hofEditPhotoImg} /> : <div style={{...S.hofPhotoEmpty,fontSize:26}}>🖼️</div>}
+              </div>
+              <input ref={journeyFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 700, 0.8).then(src => setEditingJourney(j => ({...j, foto: src})))} />
+              <button style={S.ghostBtn} onClick={() => journeyFotoRef.current.click()}>{editingJourney.foto ? "Ganti Foto" : "Pilih Foto"}</button>
+              <textarea style={{...S.input,minHeight:100,resize:"vertical"}} placeholder="Deskripsi kegiatan" value={editingJourney.deskripsi || ""} onChange={e => setEditingJourney(j => ({...j, deskripsi: e.target.value}))} />
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center"}}>
+              <button style={S.primaryBtn} onClick={() => saveEditJourney(editingJourney.id, {foto:editingJourney.foto, deskripsi:editingJourney.deskripsi})}>Simpan</button>
+              <button style={S.ghostBtn} onClick={() => setEditingJourney(null)}>Batal</button>
+              <button style={{...S.deleteLink,marginLeft:"auto"}} onClick={() => { deleteJourneyPhoto(editingJourney.id); setEditingJourney(null); }}>Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hofExpandedCard && (
+        <div style={S.hofExpandOverlay} onClick={() => setHofExpandedCard(null)}>
+          <div style={S.hofExpandPanel} onClick={e => e.stopPropagation()}>
+            <button style={S.hofExpandClose} onClick={() => setHofExpandedCard(null)}>✕</button>
+            <div style={S.hofExpandPhotoWrap}>
+              {hofExpandedCard.foto ? <img src={hofExpandedCard.foto} alt="" style={S.hofExpandPhotoImg} /> : <div style={{fontSize:60,opacity:0.3}}>👤</div>}
+            </div>
+            <div style={S.hofExpandName}>{hofExpandedCard.nama || "Belum diisi"}</div>
+            <div style={S.hofExpandRole}>{hofExpandedCard.role === "ketua" ? "Ketua" : "Wakil Ketua"} · {hofExpandedCard.periodeLabel}</div>
+            {hofExpandedCard.npm && <div style={S.hofExpandNpm}>NPM {hofExpandedCard.npm}</div>}
+            {hofExpandedCard.kabinetNama && <div style={S.hofExpandKabinet}>Kabinet {hofExpandedCard.kabinetNama}</div>}
+            {hofExpandedCard.medsos && <a href={hofExpandedCard.medsos} target="_blank" rel="noreferrer" style={S.hofExpandMedsos}>Lihat Media Sosial ↗</a>}
+            {isAdmin && (
+              <button style={{...S.ghostBtn,marginTop:14}} onClick={() => { setEditingKetua(hofKetua.find(k => k.id === hofExpandedCard.periode)); setHofExpandedCard(null); }}>Edit Kartu Ini</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {hofQuoteOverlay && (
+        <div style={S.hofQuoteOverlay} className="hof-quote-anim">
+          <div style={S.hofQuoteOverlayText}>"{hofQuoteOverlay}"</div>
         </div>
       )}
 
@@ -1040,7 +1172,7 @@ export default function App() {
         <main style={S.main}>
           {loading ? <div style={S.emptyState}>Memuat data...</div> : (
             <>
-              <SectionHeader eyebrow="ARSIP VISUAL" title="Galeri Kegiatan" />
+              <SectionHeader eyebrow="ARSIP VISUAL" title="GALERI KEGIATAN" />
               {isAdmin && (
                 <div style={S.formCard}>
                   <div style={S.formCardTitle}>+ Tambah Kegiatan Baru</div>
@@ -1319,80 +1451,97 @@ export default function App() {
             <div style={S.hofHeroTitle}>Hall of Fame</div>
           </div>
 
-          <div style={S.hofToggleRow}>
-            <button style={{...S.hofToggleBtn, ...(hofView === "ketua" ? S.hofToggleBtnActive : {})}} onClick={() => setHofView("ketua")}>Ketua</button>
-            <button style={{...S.hofToggleBtn, ...(hofView === "kabinet" ? S.hofToggleBtnActive : {})}} onClick={() => setHofView("kabinet")}>Kabinet</button>
+          <div style={S.hofDotNav}>
+            {[["intro","Pembuka"],["journey","Journey"],["leadership","Kepemimpinan"]].map(([key,label]) => (
+              <button key={key} style={{...S.hofNavDot, ...(hofActiveSection === key ? S.hofNavDotActive : {})}} onClick={() => hofGoToSection(key)} aria-label={label} title={label} />
+            ))}
           </div>
 
-          {hofView === "ketua" && (
-            <div style={S.hofKetuaSection}>
-              {hofCards.length === 0 ? (
-                <div style={S.emptyState}>
-                  Belum ada data Ketua &amp; Wakil.
-                  {isAdmin && <div style={{marginTop:14}}><button style={S.primaryBtn} onClick={addKetuaPeriode}>+ Tambah Periode</button></div>}
-                </div>
-              ) : (
-                <>
-                  <div style={S.hofCardStage} onTouchStart={hofTouchStart} onTouchEnd={hofTouchEnd}>
-                    <button style={{...S.hofArrowBtn,left:0}} onClick={hofPrev} aria-label="Sebelumnya">‹</button>
-                    <div key={hofIndex} className={hofDir === 1 ? "hof-slide-next" : "hof-slide-prev"}>
-                      <KetuaCard card={hofCurrent} flipped={hofFlipped} onFlip={() => setHofFlipped(f => !f)} onLihatKabinet={() => goToKabinet(hofCurrent.periode)} isAdmin={isAdmin} onEdit={() => setEditingKetua(hofCurrent)} />
-                    </div>
-                    <button style={{...S.hofArrowBtn,right:0}} onClick={hofNext} aria-label="Berikutnya">›</button>
-                  </div>
-                  <div style={S.hofDots}>
-                    {hofCards.map((c, i) => (
-                      <span key={i} style={{...S.hofDot, ...(i === hofIndex ? S.hofDotActive : {})}}>♦</span>
-                    ))}
-                  </div>
-                  {isAdmin && (
-                    <div style={{textAlign:"center",marginTop:16}}>
-                      <button style={S.ghostBtn} onClick={addKetuaPeriode}>+ Tambah Periode Baru</button>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div style={S.hofQuoteBar}>
-                <div style={S.hofQuoteText}>"{LEADERSHIP_QUOTES[hofQuoteIdx]}"</div>
+          <div ref={el => (hofSectionRefs.current.intro = el)}>
+            <HofParticleIntro
+              kabinetList={hofKabinetSorted}
+              pressedLogo={hofPressedLogo}
+              showIdentity={hofShowIdentity}
+              onPressStart={hofLogoPressStart}
+              onPressEnd={hofLogoPressEnd}
+            />
+            {isAdmin && (
+              <div style={{textAlign:"center",margin:"18px 0 40px"}}>
+                <button style={S.ghostBtn} onClick={() => setShowKelolaKabinet(true)}>Kelola Data Kabinet</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {hofView === "kabinet" && (
-            <div style={S.hofKabinetSection}>
-              {isAdmin && (
-                <div style={{textAlign:"center",marginBottom:24}}>
-                  <button style={S.primaryBtn} onClick={addKabinet}>+ Tambah Kabinet</button>
-                </div>
-              )}
-              {hofKabinetSorted.length === 0 ? (
-                <div style={S.emptyState}>Belum ada data kabinet.</div>
-              ) : (
-                <div style={S.hofKabinetList}>
-                  {hofKabinetSorted.map(k => (
-                    <div key={k.id} ref={el => (kabinetRefs.current[k.id] = el)} style={S.hofKabinetItem}>
-                      <div style={S.hofCardCorner1} />
-                      <div style={S.hofCardCorner2} />
-                      <div style={S.hofKabinetLogoWrap} onClick={() => setActiveKabinetModal(k)}>
-                        {k.logo ? <img src={k.logo} alt={k.nama_kabinet} style={S.hofKabinetLogoImg} /> : <div style={S.hofKabinetLogoEmpty}>🛡️</div>}
-                      </div>
-                      <div style={S.hofKabinetInfo} onClick={() => setActiveKabinetModal(k)}>
-                        <div style={S.hofKabinetName}>{k.nama_kabinet || "Nama Kabinet"}</div>
-                        <div style={S.hofKabinetPeriode}>{k.periode ? "Periode " + k.periode : "-"}</div>
-                        {isAdmin && (
-                          <div style={{display:"flex",gap:14,marginTop:8}}>
-                            <button style={S.deleteLink} onClick={e => { e.stopPropagation(); setEditingKabinet(k); }}>Edit</button>
-                            <button style={S.deleteLink} onClick={e => { e.stopPropagation(); deleteKabinet(k.id); }}>Hapus</button>
-                          </div>
-                        )}
-                      </div>
+          <div ref={el => (hofSectionRefs.current.journey = el)} style={S.hofJourneySection}>
+            <div style={S.hofSectionTitle}>HIMA IP Journey</div>
+            <div style={S.hofSectionSub}>Jejak langkah &amp; momen perjalanan HIMA Ilmu Pemerintahan</div>
+            {isAdmin && (
+              <div style={{textAlign:"center",margin:"18px 0"}}>
+                <input ref={journeyFotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && addJourneyPhoto(e.target.files[0])} />
+                <button style={S.primaryBtn} onClick={() => journeyFotoRef.current.click()}>+ Tambah Foto Kegiatan</button>
+              </div>
+            )}
+            {hofJourneySorted.length === 0 ? (
+              <div style={S.emptyState}>Belum ada foto kegiatan.</div>
+            ) : (
+              <div style={S.hofJourneyList}>
+                {hofJourneySorted.map((j, i) => (
+                  <div key={j.id} style={{...S.hofJourneyRow, flexDirection: i % 2 === 0 ? "row" : "row-reverse"}}>
+                    <div style={S.hofJourneyPhotoWrap}>
+                      {j.foto ? <img src={j.foto} alt="" style={S.hofJourneyPhotoImg} /> : <div style={{fontSize:40,opacity:0.3}}>🖼️</div>}
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div style={S.hofJourneyDesc}>
+                      <div style={S.hofJourneyDescText}>{j.deskripsi || "Belum ada deskripsi."}</div>
+                      {isAdmin && (
+                        <div style={{display:"flex",gap:12,marginTop:12,flexWrap:"wrap"}}>
+                          <button style={S.deleteLink} onClick={() => setEditingJourney(j)}>Edit</button>
+                          <button style={S.deleteLink} onClick={() => moveJourneyPhoto(j.id, -1)}>↑ Naik</button>
+                          <button style={S.deleteLink} onClick={() => moveJourneyPhoto(j.id, 1)}>↓ Turun</button>
+                          <button style={S.deleteLink} onClick={() => deleteJourneyPhoto(j.id)}>Hapus</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div ref={el => (hofSectionRefs.current.leadership = el)} style={S.hofLeaderSection}>
+            <div style={S.hofSectionTitle}>Historical of Leadership</div>
+            <div style={S.hofSectionSub}>Profil Riwayat Kepemimpinan HIMA IP</div>
+
+            <div style={S.hofFilterRow}>
+              <button style={{...S.hofFilterPill, ...(hofLeaderFilter === "semua" ? S.hofFilterPillActive : {})}} onClick={() => setHofLeaderFilter("semua")}>Semua Kabinet</button>
+              {hofKabinetSorted.map(k => (
+                <button key={k.id} style={{...S.hofFilterPill, ...(hofLeaderFilter === k.nama_kabinet ? S.hofFilterPillActive : {})}} onClick={() => setHofLeaderFilter(k.nama_kabinet)}>{k.nama_kabinet}</button>
+              ))}
             </div>
-          )}
+
+            {isAdmin && (
+              <div style={{textAlign:"center",margin:"18px 0"}}>
+                <button style={S.primaryBtn} onClick={addKetuaPeriode}>+ Tambah Periode</button>
+              </div>
+            )}
+
+            {hofLeaderFiltered.length === 0 ? (
+              <div style={S.emptyState}>Belum ada data untuk kategori ini.</div>
+            ) : (
+              <div style={S.hofLeaderGrid}>
+                {hofLeaderFiltered.map(c => (
+                  <div key={c.id} style={S.hofLeaderCard} onClick={() => setHofExpandedCard(c)}>
+                    <div style={S.hofCardCorner1} />
+                    <div style={S.hofCardCorner2} />
+                    <div style={S.hofLeaderPhotoWrap}>
+                      {c.foto ? <img src={c.foto} alt={c.nama} style={S.hofLeaderPhotoImg} /> : <div style={{fontSize:36,opacity:0.3}}>👤</div>}
+                    </div>
+                    <div style={S.hofLeaderName}>{c.nama || "Belum diisi"}</div>
+                    <div style={S.hofLeaderRole}>{c.role === "ketua" ? "Ketua" : "Wakil Ketua"} · {c.periodeLabel}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1552,49 +1701,138 @@ function StatCard({ num, label }) {
     </div>
   );
 }
-function KetuaCard({ card, flipped, onFlip, onLihatKabinet, isAdmin, onEdit }) {
-  if (!card) return null;
-  const nama = card.role === "ketua" ? card.ketua_nama : card.wakil_nama;
-  const npm = card.role === "ketua" ? card.ketua_npm : card.wakil_npm;
-  const foto = card.role === "ketua" ? card.ketua_foto : card.wakil_foto;
-  const jabatanLabel = card.role === "ketua" ? "Ketua HIMA-IP" : "Wakil Ketua HIMA-IP";
+function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart, onPressEnd }) {
+  const canvasRef = useRef(null);
+  const particlesRef = useRef([]);
+  const targetsRef = useRef(null);
+  const pointCacheRef = useRef({});
+  const rafRef = useRef(null);
+  const sizeRef = useRef({ w: 300, h: 230 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    function resize() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const w = rect.width, h = 230;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + "px"; canvas.style.height = h + "px";
+      sizeRef.current = { w, h };
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const N = 150;
+    particlesRef.current = Array.from({ length: N }, () => ({
+      x: Math.random() * sizeRef.current.w,
+      y: Math.random() * sizeRef.current.h,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      r: 200 + Math.random() * 40, g: 180 + Math.random() * 40, b: 120 + Math.random() * 60,
+      size: Math.random() * 1.5 + 0.6
+    }));
+
+    const ctx = canvas.getContext("2d");
+    function tick() {
+      const dpr = window.devicePixelRatio || 1;
+      const { w, h } = sizeRef.current;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const targets = targetsRef.current;
+      const ps = particlesRef.current;
+      for (let i = 0; i < ps.length; i++) {
+        const p = ps[i];
+        if (targets && targets.length) {
+          const t = targets[i % targets.length];
+          p.x += (t.x - p.x) * 0.1;
+          p.y += (t.y - p.y) * 0.1;
+          p.r += (t.r - p.r) * 0.15; p.g += (t.g - p.g) * 0.15; p.b += (t.b - p.b) * 0.15;
+        } else {
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+          p.r += (215 - p.r) * 0.01; p.g += (190 - p.g) * 0.01; p.b += (130 - p.b) * 0.01;
+        }
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${p.r | 0},${p.g | 0},${p.b | 0},0.9)`;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    tick();
+    return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener("resize", resize); };
+  }, []);
+
+  useEffect(() => {
+    if (!pressedLogo || !pressedLogo.logo) { targetsRef.current = null; return; }
+    const cacheKey = pressedLogo.id;
+    if (pointCacheRef.current[cacheKey]) { targetsRef.current = pointCacheRef.current[cacheKey]; return; }
+    const img = new Image();
+    img.onload = () => {
+      const S = 46;
+      const off = document.createElement("canvas");
+      off.width = S; off.height = S;
+      const octx = off.getContext("2d");
+      const scale = Math.min(S / img.width, S / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      octx.clearRect(0, 0, S, S);
+      octx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
+      let data;
+      try { data = octx.getImageData(0, 0, S, S).data; } catch (e) { return; }
+      const { w, h } = sizeRef.current;
+      const boxSize = Math.min(w, h) * 0.62;
+      const offsetX = w / 2 - boxSize / 2, offsetY = h / 2 - boxSize / 2;
+      const pts = [];
+      for (let yy = 0; yy < S; yy++) {
+        for (let xx = 0; xx < S; xx++) {
+          const idx = (yy * S + xx) * 4;
+          if (data[idx + 3] > 120) {
+            pts.push({ x: offsetX + (xx / S) * boxSize, y: offsetY + (yy / S) * boxSize, r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+          }
+        }
+      }
+      let sampled = pts;
+      if (pts.length > 220) { const step = Math.ceil(pts.length / 220); sampled = pts.filter((_, i) => i % step === 0); }
+      pointCacheRef.current[cacheKey] = sampled;
+      targetsRef.current = sampled;
+    };
+    img.src = pressedLogo.logo;
+  }, [pressedLogo]);
+
   return (
-    <div style={S.hofCardOuter}>
-      <div style={{...S.hofCardInner, transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)"}}>
-        <div style={{...S.hofCardFace, ...S.hofCardFront}} onClick={onFlip}>
-          {isAdmin && (
-            <button style={S.hofEditBtn} onClick={e => { e.stopPropagation(); onEdit(); }} title="Edit kartu">✎</button>
-          )}
-          <div style={S.hofCardCorner1} />
-          <div style={S.hofCardCorner2} />
-          <div style={S.hofPhotoWrap}>
-            {foto ? <img src={foto} alt={nama || ""} style={S.hofPhotoImg} /> : <div style={S.hofPhotoEmpty}>👤</div>}
-          </div>
-          <div style={S.hofJabatan}>{jabatanLabel}</div>
-          <div style={S.hofPeriodeSmall}>Periode {card.periode || "-"}</div>
-          <div style={S.hofNama}>{nama || "Nama...."}</div>
-          <div style={S.hofNpm}>NPM {npm || "...."}</div>
-          <button style={S.hofLihatKabinetBtn} onClick={e => { e.stopPropagation(); onLihatKabinet(); }}>Lihat Kabinet</button>
-          <div style={S.hofTapHint}>Ketuk kartu untuk membalik ↺</div>
-        </div>
-        <div style={{...S.hofCardFace, ...S.hofCardBack}} onClick={onFlip}>
-          <img
-            src="/hof-card-back.png"
-            alt="Kartu Belakang"
-            style={S.hofBackFullImg}
-            onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "block"; }}
-          />
-          <div style={{...S.hofBackContent, display:"none"}}>
-            <div style={S.hofBatikPattern} />
-            <div style={S.hofBackEyebrow}>Himpunan Mahasiswa</div>
-            <div style={S.hofBackTitle}>Ilmu Pemerintahan</div>
-            <div style={S.hofBackSub}>STISIP Tasikmalaya</div>
-            <div style={S.hofBackBadge}>
-              <img src="/logo-kabinet.png" alt="Logo" style={S.hofBackBadgeImg} onError={e => e.target.style.display="none"} />
+    <div style={S.hofIntroWrap}>
+      <div style={S.hofGlassBox}>
+        <canvas ref={canvasRef} style={S.hofParticleCanvas} />
+      </div>
+      <div style={S.hofMarqueeOuter}>
+        <div className="hof-marquee-track" style={{ animationPlayState: pressedLogo ? "paused" : "running" }}>
+          {kabinetList.length > 0 && [...kabinetList, ...kabinetList].map((k, i) => (
+            <div
+              key={k.id + "_" + i}
+              style={S.hofMarqueeLogo}
+              onPointerDown={() => onPressStart(k)}
+              onPointerUp={onPressEnd}
+              onPointerLeave={onPressEnd}
+              onPointerCancel={onPressEnd}
+              onContextMenu={e => e.preventDefault()}
+            >
+              {k.logo ? <img src={k.logo} alt={k.nama_kabinet} style={S.hofMarqueeLogoImg} draggable={false} /> : <div style={{ fontSize: 22, opacity: 0.5 }}>🛡️</div>}
             </div>
-          </div>
+          ))}
         </div>
       </div>
+      {pressedLogo && showIdentity && (
+        <div style={S.hofIdentityCard}>
+          <div style={S.hofIdentityName}>{pressedLogo.nama_kabinet || "Nama Kabinet"}</div>
+          <div style={S.hofIdentityPeriode}>{pressedLogo.periode ? "Periode " + pressedLogo.periode : ""}</div>
+          <div style={S.hofIdentityFilosofi}>{pressedLogo.filosofi || "Filosofi kabinet belum diisi."}</div>
+        </div>
+      )}
+      {kabinetList.length === 0 && (
+        <div style={{ textAlign: "center", color: "#c9c2ad", fontSize: 12.5, marginTop: 10 }}>Belum ada logo kabinet. Tambahkan lewat mode admin.</div>
+      )}
     </div>
   );
 }
@@ -1943,6 +2181,63 @@ const S = {
   hofKabinetInfo:{flex:1,cursor:"pointer"},
   hofKabinetName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:17,color:C.navy},
   hofKabinetPeriode:{fontSize:12.5,color:C.muted,fontStyle:"italic",marginTop:2},
+
+  // ===== HOF v2: dot nav =====
+  hofDotNav:{position:"fixed",right:14,top:"50%",transform:"translateY(-50%)",display:"flex",flexDirection:"column",gap:12,zIndex:40},
+  hofNavDot:{width:11,height:11,borderRadius:"50%",background:"transparent",border:`2px solid ${C.gold}`,padding:0,cursor:"pointer"},
+  hofNavDotActive:{background:C.gold},
+
+  // ===== HOF v2: particle intro =====
+  hofIntroWrap:{maxWidth:520,margin:"10px auto 0",padding:"0 16px"},
+  hofGlassBox:{position:"relative",borderRadius:18,overflow:"hidden",background:"radial-gradient(circle at 30% 20%, #1b1440 0%, #0a0a1f 60%, #000 100%)",border:"1px solid rgba(182,138,61,0.45)",boxShadow:"0 20px 50px rgba(0,0,0,0.5), inset 0 0 40px rgba(182,138,61,0.08)",backdropFilter:"blur(2px)"},
+  hofParticleCanvas:{display:"block",width:"100%",height:230},
+  hofMarqueeOuter:{marginTop:14,overflow:"hidden",background:"rgba(10,10,20,0.9)",border:"1px solid rgba(182,138,61,0.35)",borderRadius:12,padding:"10px 0"},
+  hofMarqueeLogo:{width:64,height:64,minWidth:64,margin:"0 10px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(182,138,61,0.3)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",touchAction:"none",WebkitTouchCallout:"none",WebkitUserSelect:"none",userSelect:"none"},
+  hofMarqueeLogoImg:{width:"70%",height:"70%",objectFit:"contain",pointerEvents:"none"},
+  hofIdentityCard:{marginTop:14,padding:"16px 18px",borderRadius:12,background:"rgba(10,10,20,0.92)",border:`1px solid ${C.gold}`,textAlign:"center",animation:"hofSlideNext 0.4s ease"},
+  hofIdentityName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:17,color:C.gold},
+  hofIdentityPeriode:{fontSize:12,color:"#c9c2ad",fontStyle:"italic",marginTop:2},
+  hofIdentityFilosofi:{fontSize:13,color:"#e8e2d0",lineHeight:1.6,marginTop:10,whiteSpace:"pre-wrap"},
+
+  // ===== HOF v2: journey =====
+  hofJourneySection:{maxWidth:600,margin:"70px auto 0",padding:"0 18px"},
+  hofSectionTitle:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:24,color:C.navy,textAlign:"center"},
+  hofSectionSub:{fontSize:13,color:C.muted,textAlign:"center",marginTop:4,fontStyle:"italic"},
+  hofJourneyList:{display:"flex",flexDirection:"column",gap:34,marginTop:24},
+  hofJourneyRow:{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"},
+  hofJourneyPhotoWrap:{width:180,aspectRatio:"3 / 4",borderRadius:12,overflow:"hidden",background:"#e5ded0",border:`3px solid ${C.gold}`,flex:"0 0 auto",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 24px rgba(0,0,0,0.15)"},
+  hofJourneyPhotoImg:{width:"100%",height:"100%",objectFit:"cover"},
+  hofJourneyDesc:{flex:"1 1 180px",minWidth:180},
+  hofJourneyDescText:{fontSize:14,lineHeight:1.7,color:"#3a3a3a"},
+
+  // ===== HOF v2: leadership =====
+  hofLeaderSection:{maxWidth:600,margin:"70px auto 40px",padding:"0 18px"},
+  hofFilterRow:{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center",marginTop:18},
+  hofFilterPill:{padding:"7px 16px",borderRadius:20,border:`1px solid ${C.gold}`,background:"transparent",color:C.navy,fontSize:12.5,fontWeight:600,cursor:"pointer"},
+  hofFilterPillActive:{background:C.gold,color:C.white},
+  hofLeaderGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:8},
+  hofLeaderCard:{position:"relative",background:C.offwhite,border:"1px solid rgba(182,138,61,0.4)",borderRadius:14,padding:"14px 10px",textAlign:"center",cursor:"pointer",boxShadow:"0 8px 22px rgba(0,0,0,0.1)"},
+  hofLeaderPhotoWrap:{width:"100%",aspectRatio:"1 / 1",borderRadius:10,overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.gold}`,marginBottom:10},
+  hofLeaderPhotoImg:{width:"100%",height:"100%",objectFit:"cover"},
+  hofLeaderName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:14.5,color:C.navy},
+  hofLeaderRole:{fontSize:11.5,color:C.muted,fontStyle:"italic",marginTop:3},
+
+  // ===== HOF v2: expand detail panel =====
+  hofExpandOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20},
+  hofExpandPanel:{position:"relative",background:C.offwhite,borderRadius:18,padding:"30px 24px",maxWidth:360,width:"100%",textAlign:"center",border:`1px solid ${C.gold}`,boxShadow:"0 24px 60px rgba(0,0,0,0.4)",animation:"hofSlideNext 0.4s ease",maxHeight:"85vh",overflowY:"auto"},
+  hofExpandClose:{position:"absolute",top:12,right:14,background:"none",border:"none",fontSize:18,color:C.navy,cursor:"pointer"},
+  hofExpandPhotoWrap:{width:130,height:130,margin:"0 auto 16px",borderRadius:16,overflow:"hidden",background:"#e5ded0",border:`3px solid ${C.gold}`,display:"flex",alignItems:"center",justifyContent:"center"},
+  hofExpandPhotoImg:{width:"100%",height:"100%",objectFit:"cover"},
+  hofExpandName:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:19,color:C.navy},
+  hofExpandRole:{fontSize:12.5,color:C.muted,fontStyle:"italic",marginTop:4},
+  hofExpandNpm:{fontSize:13,color:"#3a3a3a",marginTop:10},
+  hofExpandKabinet:{fontSize:13,color:"#3a3a3a",marginTop:4},
+  hofExpandMedsos:{display:"inline-block",marginTop:14,fontSize:13,color:C.gold,fontWeight:600,textDecoration:"none"},
+
+  // ===== HOF v2: journey edit preview + quote overlay =====
+  hofJourneyEditPreview:{width:110,aspectRatio:"3 / 4",margin:"0 auto",borderRadius:10,overflow:"hidden",background:"#e5ded0",display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.gold}`},
+  hofQuoteOverlay:{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:40,pointerEvents:"none"},
+  hofQuoteOverlayText:{color:C.gold,fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:19,textAlign:"center",lineHeight:1.6,maxWidth:340},
   hofKabinetModalBadge:{width:90,height:90,margin:"0 auto 4px",display:"flex",alignItems:"center",justifyContent:"center"},
   hofKabinetModalPattern:{height:14,margin:"0 -30px 18px",backgroundImage:"repeating-linear-gradient(45deg, transparent 0 6px, rgba(182,138,61,0.4) 6px 7px), repeating-linear-gradient(-45deg, transparent 0 6px, rgba(182,138,61,0.4) 6px 7px)",backgroundColor:C.red}
 };
