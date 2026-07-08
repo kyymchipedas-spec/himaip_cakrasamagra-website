@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as THREE from "three";
 
 const SUPABASE_URL = "https://vwhfzqbpqrxonswzjbft.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3aGZ6cWJwcXJ4b25zd3pqYmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MTg4ODAsImV4cCI6MjA5ODQ5NDg4MH0.gyWUpVWyTaQL5Tr3lR5N1YxfjEak2IKci4pwkMPnBtM";
@@ -98,6 +99,26 @@ function compressImage(file, maxW = 800, quality = 0.65) {
         canvas.width = img.width * scale; canvas.height = img.height * scale;
         canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject; img.src = e.target.result;
+    };
+    reader.onerror = reject; reader.readAsDataURL(file);
+  });
+}
+// Sama seperti compressImage, tapi mempertahankan transparansi (PNG).
+// Wajib dipakai untuk aset seperti logo kabinet yang punya background transparan,
+// karena JPEG akan menimpa area transparan itu jadi hitam solid.
+function compressImagePNG(file, maxW = 500) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
       };
       img.onerror = reject; img.src = e.target.result;
     };
@@ -758,7 +779,7 @@ export default function App() {
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
             <div style={S.drawerTitle}>HIMA IP</div>
-            {[["beranda","Beranda"],["galeri","GALERI KEGIATAN"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"]].map(([key,label]) => (
+            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"]].map(([key,label]) => (
               <button key={key} style={{...S.drawerItem,...(tab===key?S.drawerItemActive:{})}} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -972,7 +993,7 @@ export default function App() {
                 <div style={S.hofEditPhotoPreview}>
                   {editingKabinet.logo ? <img src={editingKabinet.logo} alt="" style={S.hofEditPhotoImg} /> : <div style={{...S.hofPhotoEmpty,fontSize:22}}>🛡️</div>}
                 </div>
-                <input ref={kabinetLogoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 400, 0.85).then(src => setEditingKabinet(k => ({...k, logo: src})))} />
+                <input ref={kabinetLogoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files[0] && compressImagePNG(e.target.files[0], 500).then(src => setEditingKabinet(k => ({...k, logo: src})))} />
                 <button style={{...S.ghostBtn,flex:1}} onClick={() => kabinetLogoRef.current.click()}>{editingKabinet.logo ? "Ganti Logo" : "Pilih Logo"}</button>
               </div>
             </div>
@@ -1172,7 +1193,7 @@ export default function App() {
         <main style={S.main}>
           {loading ? <div style={S.emptyState}>Memuat data...</div> : (
             <>
-              <SectionHeader eyebrow="ARSIP VISUAL" title="GALERI KEGIATAN" />
+              <SectionHeader eyebrow="ARSIP VISUAL" title="Galeri Kegiatan" />
               {isAdmin && (
                 <div style={S.formCard}>
                   <div style={S.formCardTitle}>+ Tambah Kegiatan Baru</div>
@@ -1701,68 +1722,157 @@ function StatCard({ num, label }) {
     </div>
   );
 }
+function makeGlowTexture() {
+  const size = 64;
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const gctx = c.getContext("2d");
+  const grad = gctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.25, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.6, "rgba(255,255,255,0.25)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  gctx.fillStyle = grad;
+  gctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart, onPressEnd }) {
   const canvasRef = useRef(null);
-  const particlesRef = useRef([]);
-  const targetsRef = useRef(null);
+  const glRef = useRef(null); // { renderer, scene, camera, points, geometry, material, texture }
+  const dataRef = useRef(null); // Float32Arrays + per-particle state
+  const targetsRef = useRef(null); // shape target points in world space, or null (idle)
   const pointCacheRef = useRef({});
   const rafRef = useRef(null);
   const sizeRef = useRef({ w: 300, h: 230 });
+  const rotYRef = useRef(0);
+
+  const N = 2200; // jumlah partikel
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-150, 150, 115, -115, -1000, 1000);
+    camera.position.z = 200;
+    camera.lookAt(0, 0, 0);
+
+    const texture = makeGlowTexture();
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(N * 3);
+    const colors = new Float32Array(N * 3);
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    const material = new THREE.PointsMaterial({
+      size: 3.2,
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true,
+      sizeAttenuation: true
+    });
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+    glRef.current = { renderer, scene, camera, points, geometry, material, texture };
+
+    // Per-particle idle wander anchors + phase, plus current/velocity state
+    const idle = [];
+    for (let i = 0; i < N; i++) {
+      idle.push({
+        ax: (Math.random() - 0.5) * 260,
+        ay: (Math.random() - 0.5) * 190,
+        az: (Math.random() - 0.5) * 90,
+        amp: 8 + Math.random() * 14,
+        freqX: 0.15 + Math.random() * 0.25,
+        freqY: 0.12 + Math.random() * 0.25,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.03 + Math.random() * 0.06, // easing rate toward target
+        r: 210 + Math.random() * 35, g: 185 + Math.random() * 35, b: 120 + Math.random() * 50
+      });
+    }
+    dataRef.current = {
+      idle,
+      curX: new Float32Array(N), curY: new Float32Array(N), curZ: new Float32Array(N),
+      curR: new Float32Array(N), curG: new Float32Array(N), curB: new Float32Array(N)
+    };
+    for (let i = 0; i < N; i++) {
+      dataRef.current.curX[i] = idle[i].ax;
+      dataRef.current.curY[i] = idle[i].ay;
+      dataRef.current.curZ[i] = idle[i].az;
+      dataRef.current.curR[i] = idle[i].r;
+      dataRef.current.curG[i] = idle[i].g;
+      dataRef.current.curB[i] = idle[i].b;
+    }
+
     function resize() {
       const rect = canvas.parentElement.getBoundingClientRect();
       const w = rect.width, h = 230;
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      canvas.style.width = w + "px"; canvas.style.height = h + "px";
+      renderer.setSize(w, h, false);
+      camera.left = -w / 2; camera.right = w / 2;
+      camera.top = h / 2; camera.bottom = -h / 2;
+      camera.updateProjectionMatrix();
       sizeRef.current = { w, h };
     }
     resize();
     window.addEventListener("resize", resize);
 
-    const N = 150;
-    particlesRef.current = Array.from({ length: N }, () => ({
-      x: Math.random() * sizeRef.current.w,
-      y: Math.random() * sizeRef.current.h,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      r: 200 + Math.random() * 40, g: 180 + Math.random() * 40, b: 120 + Math.random() * 60,
-      size: Math.random() * 1.5 + 0.6
-    }));
-
-    const ctx = canvas.getContext("2d");
+    let t = 0;
     function tick() {
-      const dpr = window.devicePixelRatio || 1;
-      const { w, h } = sizeRef.current;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
+      t += 0.016;
+      const d = dataRef.current;
       const targets = targetsRef.current;
-      const ps = particlesRef.current;
-      for (let i = 0; i < ps.length; i++) {
-        const p = ps[i];
-        if (targets && targets.length) {
-          const t = targets[i % targets.length];
-          p.x += (t.x - p.x) * 0.1;
-          p.y += (t.y - p.y) * 0.1;
-          p.r += (t.r - p.r) * 0.15; p.g += (t.g - p.g) * 0.15; p.b += (t.b - p.b) * 0.15;
+      const pos = geometry.attributes.position.array;
+      const col = geometry.attributes.color.array;
+      const hasShape = targets && targets.length;
+
+      // rotasi lembut hanya saat idle (biar logo tetap jelas terbaca saat ditekan)
+      rotYRef.current += hasShape ? (0 - rotYRef.current) * 0.08 : 0.0022;
+      points.rotation.y = rotYRef.current;
+
+      for (let i = 0; i < N; i++) {
+        const idl = d.idle[i];
+        let tx, ty, tz, tr, tg, tb;
+        if (hasShape) {
+          const tp = targets[i % targets.length];
+          const jitterSeed = i * 12.9898 + Math.floor(t * 2);
+          const jitter = Math.sin(jitterSeed) * 1.6;
+          tx = tp.x; ty = tp.y; tz = tp.z + jitter;
+          tr = tp.r; tg = tp.g; tb = tp.b;
         } else {
-          p.x += p.vx; p.y += p.vy;
-          if (p.x < 0 || p.x > w) p.vx *= -1;
-          if (p.y < 0 || p.y > h) p.vy *= -1;
-          p.r += (215 - p.r) * 0.01; p.g += (190 - p.g) * 0.01; p.b += (130 - p.b) * 0.01;
+          tx = idl.ax + Math.sin(t * idl.freqX + idl.phase) * idl.amp;
+          ty = idl.ay + Math.cos(t * idl.freqY + idl.phase) * idl.amp;
+          tz = idl.az;
+          tr = idl.r; tg = idl.g; tb = idl.b;
         }
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(${p.r | 0},${p.g | 0},${p.b | 0},0.9)`;
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        const sp = idl.speed;
+        d.curX[i] += (tx - d.curX[i]) * sp;
+        d.curY[i] += (ty - d.curY[i]) * sp;
+        d.curZ[i] += (tz - d.curZ[i]) * sp;
+        d.curR[i] += (tr - d.curR[i]) * 0.08;
+        d.curG[i] += (tg - d.curG[i]) * 0.08;
+        d.curB[i] += (tb - d.curB[i]) * 0.08;
+
+        pos[i * 3] = d.curX[i]; pos[i * 3 + 1] = d.curY[i]; pos[i * 3 + 2] = d.curZ[i];
+        col[i * 3] = d.curR[i] / 255; col[i * 3 + 1] = d.curG[i] / 255; col[i * 3 + 2] = d.curB[i] / 255;
       }
+      geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.color.needsUpdate = true;
+      renderer.render(scene, camera);
       rafRef.current = requestAnimationFrame(tick);
     }
     tick();
-    return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener("resize", resize); };
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", resize);
+      geometry.dispose(); material.dispose(); texture.dispose(); renderer.dispose();
+    };
   }, []);
 
   useEffect(() => {
@@ -1770,8 +1880,9 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
     const cacheKey = pressedLogo.id;
     if (pointCacheRef.current[cacheKey]) { targetsRef.current = pointCacheRef.current[cacheKey]; return; }
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      const S = 46;
+      const S = 84;
       const off = document.createElement("canvas");
       off.width = S; off.height = S;
       const octx = off.getContext("2d");
@@ -1781,23 +1892,28 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
       octx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
       let data;
       try { data = octx.getImageData(0, 0, S, S).data; } catch (e) { return; }
-      const { w, h } = sizeRef.current;
-      const boxSize = Math.min(w, h) * 0.62;
-      const offsetX = w / 2 - boxSize / 2, offsetY = h / 2 - boxSize / 2;
+      const boxSize = 150; // ukuran logo dalam unit world (canvas ortho ~300x230)
       const pts = [];
       for (let yy = 0; yy < S; yy++) {
         for (let xx = 0; xx < S; xx++) {
           const idx = (yy * S + xx) * 4;
-          if (data[idx + 3] > 120) {
-            pts.push({ x: offsetX + (xx / S) * boxSize, y: offsetY + (yy / S) * boxSize, r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+          if (data[idx + 3] > 90) {
+            pts.push({
+              x: (xx / S - 0.5) * boxSize,
+              y: -(yy / S - 0.5) * boxSize,
+              z: (Math.random() - 0.5) * 14,
+              r: data[idx], g: data[idx + 1], b: data[idx + 2]
+            });
           }
         }
       }
       let sampled = pts;
-      if (pts.length > 220) { const step = Math.ceil(pts.length / 220); sampled = pts.filter((_, i) => i % step === 0); }
+      if (pts.length > N) { const step = Math.ceil(pts.length / N); sampled = pts.filter((_, i) => i % step === 0); }
+      if (!sampled.length) return;
       pointCacheRef.current[cacheKey] = sampled;
       targetsRef.current = sampled;
     };
+    img.onerror = () => { targetsRef.current = null; };
     img.src = pressedLogo.logo;
   }, [pressedLogo]);
 
