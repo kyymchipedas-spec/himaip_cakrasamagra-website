@@ -1746,10 +1746,10 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
   const targetsRef = useRef(null); // shape target points in world space, or null (idle)
   const pointCacheRef = useRef({});
   const rafRef = useRef(null);
-  const sizeRef = useRef({ w: 300, h: 230 });
+  const sizeRef = useRef({ w: 300, h: 400 });
   const rotYRef = useRef(0);
 
-  const N = 2200; // jumlah partikel
+  const N = 3200; // jumlah partikel
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1758,7 +1758,7 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-150, 150, 115, -115, -1000, 1000);
+    const camera = new THREE.OrthographicCamera(-150, 150, 200, -200, -1000, 1000);
     camera.position.z = 200;
     camera.lookAt(0, 0, 0);
 
@@ -1769,58 +1769,64 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     const material = new THREE.PointsMaterial({
-      size: 3.2,
+      size: 5.5,
       map: texture,
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       vertexColors: true,
-      sizeAttenuation: true
+      sizeAttenuation: false
     });
     const points = new THREE.Points(geometry, material);
     scene.add(points);
     glRef.current = { renderer, scene, camera, points, geometry, material, texture };
 
-    // Per-particle idle wander anchors + phase, plus current/velocity state
-    const idle = [];
-    for (let i = 0; i < N; i++) {
-      idle.push({
-        ax: (Math.random() - 0.5) * 260,
-        ay: (Math.random() - 0.5) * 190,
-        az: (Math.random() - 0.5) * 90,
-        amp: 8 + Math.random() * 14,
-        freqX: 0.15 + Math.random() * 0.25,
-        freqY: 0.12 + Math.random() * 0.25,
-        phase: Math.random() * Math.PI * 2,
-        speed: 0.03 + Math.random() * 0.06, // easing rate toward target
-        r: 210 + Math.random() * 35, g: 185 + Math.random() * 35, b: 120 + Math.random() * 50
-      });
-    }
-    dataRef.current = {
-      idle,
-      curX: new Float32Array(N), curY: new Float32Array(N), curZ: new Float32Array(N),
-      curR: new Float32Array(N), curG: new Float32Array(N), curB: new Float32Array(N)
-    };
-    for (let i = 0; i < N; i++) {
-      dataRef.current.curX[i] = idle[i].ax;
-      dataRef.current.curY[i] = idle[i].ay;
-      dataRef.current.curZ[i] = idle[i].az;
-      dataRef.current.curR[i] = idle[i].r;
-      dataRef.current.curG[i] = idle[i].g;
-      dataRef.current.curB[i] = idle[i].b;
+    let inited = false;
+    function makeIdleParticles(w, h) {
+      // anchor tersebar proporsional ke ukuran box asli (bukan angka tetap),
+      // ini yang tadinya bikin partikel ngumpul jadi gumpalan sempit di kotak besar
+      const idle = [];
+      for (let i = 0; i < N; i++) {
+        idle.push({
+          ax: (Math.random() - 0.5) * w * 0.92,
+          ay: (Math.random() - 0.5) * h * 0.92,
+          az: (Math.random() - 0.5) * Math.min(w, h) * 0.3,
+          amp: Math.min(w, h) * (0.03 + Math.random() * 0.05),
+          freqX: 0.15 + Math.random() * 0.25,
+          freqY: 0.12 + Math.random() * 0.25,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.03 + Math.random() * 0.06,
+          r: 210 + Math.random() * 35, g: 185 + Math.random() * 35, b: 120 + Math.random() * 50
+        });
+      }
+      dataRef.current = {
+        idle,
+        curX: new Float32Array(N), curY: new Float32Array(N), curZ: new Float32Array(N),
+        curR: new Float32Array(N), curG: new Float32Array(N), curB: new Float32Array(N)
+      };
+      for (let i = 0; i < N; i++) {
+        dataRef.current.curX[i] = idle[i].ax;
+        dataRef.current.curY[i] = idle[i].ay;
+        dataRef.current.curZ[i] = idle[i].az;
+        dataRef.current.curR[i] = idle[i].r;
+        dataRef.current.curG[i] = idle[i].g;
+        dataRef.current.curB[i] = idle[i].b;
+      }
     }
 
     function resize() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      const w = rect.width, h = 230;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 300, h = rect.height || 400;
       renderer.setSize(w, h, false);
       camera.left = -w / 2; camera.right = w / 2;
       camera.top = h / 2; camera.bottom = -h / 2;
       camera.updateProjectionMatrix();
       sizeRef.current = { w, h };
+      if (!inited) { makeIdleParticles(w, h); inited = true; }
     }
     resize();
-    window.addEventListener("resize", resize);
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     let t = 0;
     function tick() {
@@ -1870,7 +1876,7 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", resize);
+      ro.disconnect();
       geometry.dispose(); material.dispose(); texture.dispose(); renderer.dispose();
     };
   }, []);
@@ -1882,7 +1888,7 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      const S = 84;
+      const S = 128;
       const off = document.createElement("canvas");
       off.width = S; off.height = S;
       const octx = off.getContext("2d");
@@ -1892,15 +1898,17 @@ function HofParticleIntro({ kabinetList, pressedLogo, showIdentity, onPressStart
       octx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
       let data;
       try { data = octx.getImageData(0, 0, S, S).data; } catch (e) { return; }
-      const boxSize = 150; // ukuran logo dalam unit world (canvas ortho ~300x230)
+      const { w: curW, h: curH } = sizeRef.current;
+      const boxSize = Math.min(curW, curH) * 0.72; // ukuran logo relatif ke ukuran box asli
+      const cell = boxSize / S; // jarak antar grid, dipakai buat jitter biar nggak jadi garis-garis kaku
       const pts = [];
       for (let yy = 0; yy < S; yy++) {
         for (let xx = 0; xx < S; xx++) {
           const idx = (yy * S + xx) * 4;
           if (data[idx + 3] > 90) {
             pts.push({
-              x: (xx / S - 0.5) * boxSize,
-              y: -(yy / S - 0.5) * boxSize,
+              x: (xx / S - 0.5) * boxSize + (Math.random() - 0.5) * cell * 0.9,
+              y: -(yy / S - 0.5) * boxSize + (Math.random() - 0.5) * cell * 0.9,
               z: (Math.random() - 0.5) * 14,
               r: data[idx], g: data[idx + 1], b: data[idx + 2]
             });
@@ -2244,13 +2252,13 @@ const S = {
   tentangQuoteBar:{background:C.black,borderTop:`2px solid ${C.gold}`,padding:"36px 20px",textAlign:"center",fontFamily:"Georgia,serif",fontStyle:"italic",fontSize:"clamp(16px,3vw,24px)",fontWeight:700,color:C.gold},
 
   // ===== Hall of Fame =====
-  hofWrap:{paddingTop:58,background:C.offwhite,minHeight:"100vh"},
+  hofWrap:{paddingTop:58,background:C.black,minHeight:"100vh"},
   hofHeroLabel:{textAlign:"center",padding:"36px 20px 0"},
   hofHeroEyebrow:{fontSize:12,letterSpacing:3,color:C.gold,fontWeight:700,textTransform:"uppercase"},
-  hofHeroTitle:{fontFamily:"Georgia,serif",fontSize:"clamp(26px,4.5vw,40px)",fontWeight:700,color:C.navy,marginTop:6},
+  hofHeroTitle:{fontFamily:"Georgia,serif",fontSize:"clamp(26px,4.5vw,40px)",fontWeight:700,color:C.white,marginTop:6},
   hofToggleRow:{display:"flex",justifyContent:"center",gap:10,padding:"22px 20px 0"},
-  hofToggleBtn:{background:"transparent",border:`1px solid ${C.navy}`,color:C.navy,padding:"9px 22px",borderRadius:30,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"},
-  hofToggleBtnActive:{background:C.navy,color:C.white},
+  hofToggleBtn:{background:"transparent",border:`1px solid ${C.gold}`,color:C.gold,padding:"9px 22px",borderRadius:30,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"},
+  hofToggleBtnActive:{background:C.gold,color:C.black},
   hofKetuaSection:{padding:"20px 20px 0"},
   hofCardStage:{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:"30px 44px",maxWidth:420,margin:"0 auto"},
   hofArrowBtn:{position:"absolute",top:"50%",transform:"translateY(-50%)",zIndex:5,background:"rgba(0,0,0,0.55)",color:C.gold,border:`1px solid ${C.gold}`,borderRadius:"50%",width:36,height:36,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"},
@@ -2304,9 +2312,9 @@ const S = {
   hofNavDotActive:{background:C.gold},
 
   // ===== HOF v2: particle intro =====
-  hofIntroWrap:{maxWidth:520,margin:"10px auto 0",padding:"0 16px"},
+  hofIntroWrap:{maxWidth:640,margin:"10px auto 0",padding:"0 16px"},
   hofGlassBox:{position:"relative",borderRadius:18,overflow:"hidden",background:"radial-gradient(circle at 30% 20%, #1b1440 0%, #0a0a1f 60%, #000 100%)",border:"1px solid rgba(182,138,61,0.45)",boxShadow:"0 20px 50px rgba(0,0,0,0.5), inset 0 0 40px rgba(182,138,61,0.08)",backdropFilter:"blur(2px)"},
-  hofParticleCanvas:{display:"block",width:"100%",height:230},
+  hofParticleCanvas:{display:"block",width:"100%",aspectRatio:"3 / 4"},
   hofMarqueeOuter:{marginTop:14,overflow:"hidden",background:"rgba(10,10,20,0.9)",border:"1px solid rgba(182,138,61,0.35)",borderRadius:12,padding:"10px 0"},
   hofMarqueeLogo:{width:64,height:64,minWidth:64,margin:"0 10px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(182,138,61,0.3)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",touchAction:"none",WebkitTouchCallout:"none",WebkitUserSelect:"none",userSelect:"none"},
   hofMarqueeLogoImg:{width:"70%",height:"70%",objectFit:"contain",pointerEvents:"none"},
@@ -2317,8 +2325,8 @@ const S = {
 
   // ===== HOF v2: journey =====
   hofJourneySection:{maxWidth:600,margin:"70px auto 0",padding:"0 18px"},
-  hofSectionTitle:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:24,color:C.navy,textAlign:"center"},
-  hofSectionSub:{fontSize:13,color:C.muted,textAlign:"center",marginTop:4,fontStyle:"italic"},
+  hofSectionTitle:{fontFamily:"Georgia,serif",fontWeight:700,fontSize:24,color:C.white,textAlign:"center"},
+  hofSectionSub:{fontSize:13,color:"#b8b2a0",textAlign:"center",marginTop:4,fontStyle:"italic"},
   hofJourneyList:{display:"flex",flexDirection:"column",gap:34,marginTop:24},
   hofJourneyRow:{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap"},
   hofJourneyPhotoWrap:{width:180,aspectRatio:"3 / 4",borderRadius:12,overflow:"hidden",background:"#e5ded0",border:`3px solid ${C.gold}`,flex:"0 0 auto",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 24px rgba(0,0,0,0.15)"},
