@@ -861,7 +861,7 @@ export default function App() {
         <div style={S.drawerOverlay} onClick={() => setMenuOpen(false)}>
           <div style={S.drawer} onClick={e => e.stopPropagation()}>
             <div style={S.drawerTitle}>HIMA IP</div>
-            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"]].map(([key,label]) => (
+            {[["beranda","Beranda"],["galeri","Galeri Kegiatan"],["anggota","Anggota"],["tentang","Tentang HIMA IP"],["hof","Hall of Fame"],["lpj","BERKAS"],["pcard","Playing Card"]].map(([key,label]) => (
               <button key={key} style={{...S.drawerItem,...(tab===key?S.drawerItemActive:{})}} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -1742,6 +1742,9 @@ export default function App() {
           </main>
         );
       })()}
+
+      {tab === "pcard" && <PlayingCardPage isAdmin={isAdmin} />}
+
       </div>
 
       <footer style={S.footer}>
@@ -1778,6 +1781,651 @@ export default function App() {
     </div>
   );
 }
+
+
+const RARITY_CONFIG = [
+  { name: "Common",   warna: "#3fa34d", poin: 1,  weight: 62.00 },
+  { name: "Uncommon", warna: "#8a8a8a", poin: 3,  weight: 22.00 },
+  { name: "Rare",     warna: "#2f6fd1", poin: 5,  weight: 10.00 },
+  { name: "SR",       warna: "#8a3fd1", poin: 7,  weight: 4.45 },
+  { name: "SSR",      warna: "#c9a227", poin: 8,  weight: 1.00 },
+  { name: "UR",       warna: "#c62828", poin: 10, weight: 0.50 },
+  { name: "SUR",      warna: "#6b1a1a", poin: 15, weight: 0 },
+];
+
+function pcRarityInfo(name) {
+  return RARITY_CONFIG.find(r => r.name === name) || RARITY_CONFIG[0];
+}
+
+function PlayingCardPage({ isAdmin }) {
+  const [cards, setCards] = useState([]);
+  const [loadingCards, setLoadingCards] = useState(true);
+  const [screen, setScreen] = useState("setup"); // setup | playing | result
+
+  // setup
+  const [jumlahPemain, setJumlahPemain] = useState(2);
+  const [namaPemain, setNamaPemain] = useState(["", ""]);
+  const [pemainAktifAwal, setPemainAktifAwal] = useState(0);
+
+  // sesi berjalan
+  const [sessionId, setSessionId] = useState(null);
+  const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
+  const [scores, setScores] = useState({});
+  const [usedCardIds, setUsedCardIds] = useState([]);
+  const [surFound, setSurFound] = useState(false);
+
+  const [turnPhase, setTurnPhase] = useState("pilih"); // pilih | dadu | swipe | reveal | pilihRekan
+  const [chosenTipe, setChosenTipe] = useState(null);
+  const [dice, setDice] = useState([1, 1]);
+  const [rollingDice, setRollingDice] = useState(false);
+  const [swipeTotal, setSwipeTotal] = useState(0);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [revealedCard, setRevealedCard] = useState(null);
+  const [flipped, setFlipped] = useState(false);
+  const [transferState, setTransferState] = useState(null); // { to, poin }
+
+  // admin kelola kartu
+  const [showKelolaKartu, setShowKelolaKartu] = useState(false);
+  const [filterRarity, setFilterRarity] = useState("Common");
+  const [newCard, setNewCard] = useState({ tipe: "truth", isi_challenge: "", gambar_url: "" });
+  const [editingCard, setEditingCard] = useState(null);
+  const cardImgRef = useRef(null);
+
+  // leaderboard
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardRows, setLeaderboardRows] = useState([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+  useEffect(() => { loadCards(); }, []);
+
+  async function loadCards() {
+    setLoadingCards(true);
+    try {
+      const data = await db.get("playing_cards");
+      setCards(Array.isArray(data) ? data : []);
+    } catch (e) {}
+    setLoadingCards(false);
+  }
+
+  async function loadLeaderboard() {
+    setLoadingLeaderboard(true);
+    try {
+      const rows = await db.get("playing_leaderboard");
+      const map = {};
+      (Array.isArray(rows) ? rows : []).forEach(r => {
+        if (!map[r.nama_pemain]) map[r.nama_pemain] = { nama: r.nama_pemain, total: 0, sesi: new Set() };
+        map[r.nama_pemain].total += r.poin;
+        map[r.nama_pemain].sesi.add(r.session_id);
+      });
+      const arr = Object.values(map).map(m => ({ nama: m.nama, total: m.total, kaliMain: m.sesi.size }));
+      arr.sort((a, b) => b.total - a.total);
+      setLeaderboardRows(arr);
+    } catch (e) {}
+    setLoadingLeaderboard(false);
+  }
+
+  function updateJumlahPemain(n) {
+    n = Math.max(2, Math.min(20, n));
+    setJumlahPemain(n);
+    setNamaPemain(prev => {
+      const arr = [...prev];
+      while (arr.length < n) arr.push("");
+      while (arr.length > n) arr.pop();
+      return arr;
+    });
+  }
+
+  function mulaiPermainan() {
+    const namaFinal = namaPemain.map((n, i) => (n.trim() || `Pemain ${i + 1}`));
+    setNamaPemain(namaFinal);
+    const scoreInit = {};
+    namaFinal.forEach(n => { scoreInit[n] = 0; });
+    setScores(scoreInit);
+    setCurrentPlayerIdx(pemainAktifAwal);
+    setSessionId(crypto.randomUUID());
+    setUsedCardIds([]);
+    setSurFound(false);
+    setTurnPhase("pilih");
+    setChosenTipe(null);
+    setTransferState(null);
+    setScreen("playing");
+  }
+
+  function pilihTipe(tipe) {
+    setChosenTipe(tipe);
+    setTurnPhase("dadu");
+  }
+
+  function kocokDadu() {
+    setRollingDice(true);
+    setTimeout(() => {
+      const d1 = 1 + Math.floor(Math.random() * 6);
+      const d2 = 1 + Math.floor(Math.random() * 6);
+      setDice([d1, d2]);
+      setSwipeTotal(d1 + d2);
+      setSwipeProgress(0);
+      setRollingDice(false);
+      setTurnPhase("swipe");
+    }, 700);
+  }
+
+  function pickCardForTurn() {
+    const pool = cards.filter(c => c.tipe === chosenTipe && !usedCardIds.includes(c.id));
+    if (pool.length === 0) return null;
+    if (!surFound) {
+      const surPool = pool.filter(c => c.rarity === "SUR");
+      if (surPool.length > 0 && Math.random() < 0.12) {
+        return surPool[Math.floor(Math.random() * surPool.length)];
+      }
+    }
+    const nonSur = pool.filter(c => c.rarity !== "SUR");
+    const usePool = nonSur.length > 0 ? nonSur : pool;
+    const weights = usePool.map(c => pcRarityInfo(c.rarity).weight || 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let roll = Math.random() * total;
+    for (let i = 0; i < usePool.length; i++) {
+      if (roll < weights[i]) return usePool[i];
+      roll -= weights[i];
+    }
+    return usePool[usePool.length - 1];
+  }
+
+  function lanjutSwipe() {
+    if (swipeProgress + 1 < swipeTotal) {
+      setSwipeProgress(p => p + 1);
+    } else {
+      const card = pickCardForTurn();
+      setRevealedCard(card);
+      setFlipped(false);
+      setTransferState(null);
+      setTurnPhase("reveal");
+    }
+  }
+
+  function bukaKartu() {
+    setFlipped(true);
+  }
+
+  function tutupTurn(pemainDapatPoin, berhasil) {
+    if (berhasil && revealedCard) {
+      const poin = pcRarityInfo(revealedCard.rarity).poin;
+      setScores(s => ({ ...s, [pemainDapatPoin]: (s[pemainDapatPoin] || 0) + poin }));
+    }
+    if (revealedCard) {
+      setUsedCardIds(ids => [...ids, revealedCard.id]);
+      if (revealedCard.rarity === "SUR") setSurFound(true);
+    }
+    setRevealedCard(null);
+    setChosenTipe(null);
+    setTransferState(null);
+    setTurnPhase("pilih");
+    setCurrentPlayerIdx(i => (i + 1) % namaPemain.length);
+  }
+
+  // Pemain saat ini menyelesaikan / menolak challenge miliknya sendiri
+  function selesaikanChallenge(berhasil) {
+    tutupTurn(namaPemain[currentPlayerIdx], berhasil);
+  }
+
+  // Berikan challenge ke rekan lain — poin kartu langsung dipotong dari pemberi
+  function berikanKeRekan(namaRekan) {
+    const poin = pcRarityInfo(revealedCard.rarity).poin;
+    const pemberi = namaPemain[currentPlayerIdx];
+    setScores(s => ({ ...s, [pemberi]: (s[pemberi] || 0) - poin }));
+    setTransferState({ to: namaRekan, poin });
+    setTurnPhase("reveal");
+  }
+
+  // Rekan yang menerima limpahan challenge menyelesaikan / menolaknya
+  function selesaikanTransfer(berhasil) {
+    tutupTurn(transferState.to, berhasil);
+  }
+
+  async function akhiriPermainan() {
+    try {
+      const entries = Object.entries(scores);
+      for (const [nama_pemain, poin] of entries) {
+        await db.insert("playing_leaderboard", { nama_pemain, poin, session_id: sessionId });
+      }
+    } catch (e) {}
+    setScreen("result");
+  }
+
+  function mainLagi() {
+    setScreen("setup");
+  }
+
+  // ---- Admin: CRUD kartu ----
+  async function tambahKartu() {
+    if (!newCard.isi_challenge.trim()) return;
+    try {
+      await db.insert("playing_cards", {
+        rarity: filterRarity,
+        tipe: newCard.tipe,
+        isi_challenge: newCard.isi_challenge.trim(),
+        gambar_url: newCard.gambar_url || null,
+      });
+      setNewCard({ tipe: "truth", isi_challenge: "", gambar_url: "" });
+      loadCards();
+    } catch (e) {}
+  }
+  async function simpanEditKartu() {
+    if (!editingCard) return;
+    try {
+      await db.update("playing_cards", editingCard.id, {
+        tipe: editingCard.tipe,
+        isi_challenge: editingCard.isi_challenge,
+        gambar_url: editingCard.gambar_url || null,
+      });
+      setEditingCard(null);
+      loadCards();
+    } catch (e) {}
+  }
+  async function hapusKartu(id) {
+    try { await db.delete("playing_cards", id); loadCards(); } catch (e) {}
+  }
+
+  const kartuFilterList = cards.filter(c => c.rarity === filterRarity);
+  const totalKartuAktif = chosenTipe ? cards.filter(c => c.tipe === chosenTipe).length : 0;
+
+  return (
+    <main style={S.main}>
+      <SectionHeader eyebrow="GAME KOMPETITIF" title="Playing Card" />
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
+        <button style={S.ghostBtn} onClick={() => { setShowLeaderboard(true); loadLeaderboard(); }}>🏆 Leaderboard All-Time</button>
+        {isAdmin && <button style={S.ghostBtn} onClick={() => setShowKelolaKartu(true)}>⚙️ Kelola Deck Kartu</button>}
+      </div>
+
+      {loadingCards ? (
+        <div style={S.emptyState}>Memuat data kartu…</div>
+      ) : cards.length === 0 ? (
+        <div style={S.emptyState}>Belum ada kartu di deck. {isAdmin ? "Tambahkan lewat Kelola Deck Kartu." : "Hubungi admin."}</div>
+      ) : screen === "setup" ? (
+        <PCSetup
+          jumlahPemain={jumlahPemain}
+          updateJumlahPemain={updateJumlahPemain}
+          namaPemain={namaPemain}
+          setNamaPemain={setNamaPemain}
+          pemainAktifAwal={pemainAktifAwal}
+          setPemainAktifAwal={setPemainAktifAwal}
+          onMulai={mulaiPermainan}
+        />
+      ) : screen === "playing" ? (
+        <PCGame
+          namaPemain={namaPemain}
+          scores={scores}
+          currentPlayerIdx={currentPlayerIdx}
+          turnPhase={turnPhase}
+          chosenTipe={chosenTipe}
+          dice={dice}
+          rollingDice={rollingDice}
+          swipeTotal={swipeTotal}
+          swipeProgress={swipeProgress}
+          revealedCard={revealedCard}
+          flipped={flipped}
+          transferState={transferState}
+          totalKartuAktif={totalKartuAktif}
+          onPilihTipe={pilihTipe}
+          onKocokDadu={kocokDadu}
+          onLanjutSwipe={lanjutSwipe}
+          onBukaKartu={bukaKartu}
+          onSelesaikanChallenge={selesaikanChallenge}
+          onMintaTransfer={() => setTurnPhase("pilihRekan")}
+          onBatalTransfer={() => setTurnPhase("reveal")}
+          onBerikanKeRekan={berikanKeRekan}
+          onSelesaikanTransfer={selesaikanTransfer}
+          onAkhiri={akhiriPermainan}
+        />
+      ) : (
+        <PCResult namaPemain={namaPemain} scores={scores} onMainLagi={mainLagi} />
+      )}
+
+      {showLeaderboard && (
+        <div style={S.modalOverlay} onClick={() => setShowLeaderboard(false)}>
+          <div style={S.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={S.modalTitle}>🏆 Leaderboard All-Time</div>
+            {loadingLeaderboard ? (
+              <div style={S.emptyState}>Memuat…</div>
+            ) : leaderboardRows.length === 0 ? (
+              <div style={S.emptyState}>Belum ada histori permainan.</div>
+            ) : (
+              <div style={{ textAlign: "left", marginTop: 14 }}>
+                {leaderboardRows.map((r, i) => (
+                  <div key={r.nama} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #e0d8c8" }}>
+                    <div>
+                      <b>{i + 1}. {r.nama}</b>
+                      <div style={{ fontSize: 11.5, color: C.muted }}>{r.kaliMain}x bermain</div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: C.red }}>{r.total} poin</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button style={{ ...S.ghostBtn, marginTop: 16 }} onClick={() => setShowLeaderboard(false)}>Tutup</button>
+          </div>
+        </div>
+      )}
+
+      {showKelolaKartu && isAdmin && (
+        <div style={S.modalOverlay} onClick={() => setShowKelolaKartu(false)}>
+          <div style={{ ...S.modalBox, maxWidth: 480, textAlign: "left" }} onClick={e => e.stopPropagation()}>
+            <div style={S.modalTitle}>⚙️ Kelola Deck Kartu</div>
+
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "14px 0" }}>
+              {RARITY_CONFIG.map(r => (
+                <button
+                  key={r.name}
+                  onClick={() => setFilterRarity(r.name)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${r.warna}`,
+                    background: filterRarity === r.name ? r.warna : "transparent",
+                    color: filterRarity === r.name ? "#fff" : r.warna,
+                    fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>
+              {kartuFilterList.length} kartu {filterRarity} tersimpan · {pcRarityInfo(filterRarity).poin} poin/kartu · Ukuran gambar disarankan 750×1050px
+            </div>
+
+            <div style={S.formCard}>
+              <div style={S.formCardTitle}>+ Tambah Kartu {filterRarity}</div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button onClick={() => setNewCard(c => ({ ...c, tipe: "truth" }))} style={{ ...S.ghostBtn, flex: 1, ...(newCard.tipe === "truth" ? S.primaryBtn : {}) }}>Truth</button>
+                <button onClick={() => setNewCard(c => ({ ...c, tipe: "dare" }))} style={{ ...S.ghostBtn, flex: 1, ...(newCard.tipe === "dare" ? S.primaryBtn : {}) }}>Dare</button>
+              </div>
+              <textarea style={{ ...S.input, minHeight: 70 }} placeholder="Isi challenge…" value={newCard.isi_challenge} onChange={e => setNewCard(c => ({ ...c, isi_challenge: e.target.value }))} />
+              <input ref={cardImgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 750, 0.75).then(src => setNewCard(c => ({ ...c, gambar_url: src })))} />
+              <button style={{ ...S.ghostBtn, marginTop: 8 }} onClick={() => cardImgRef.current.click()}>{newCard.gambar_url ? "Ganti Gambar" : "+ Gambar (opsional)"}</button>
+              <button style={{ ...S.primaryBtn, marginTop: 10, width: "100%" }} onClick={tambahKartu}>Simpan Kartu</button>
+            </div>
+
+            <div style={{ marginTop: 16, maxHeight: 260, overflowY: "auto" }}>
+              {kartuFilterList.map(c => (
+                <div key={c.id} style={{ padding: "10px 0", borderBottom: "1px solid #e0d8c8" }}>
+                  {editingCard?.id === c.id ? (
+                    <div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        <button onClick={() => setEditingCard(ec => ({ ...ec, tipe: "truth" }))} style={{ ...S.ghostBtn, flex: 1, ...(editingCard.tipe === "truth" ? S.primaryBtn : {}) }}>Truth</button>
+                        <button onClick={() => setEditingCard(ec => ({ ...ec, tipe: "dare" }))} style={{ ...S.ghostBtn, flex: 1, ...(editingCard.tipe === "dare" ? S.primaryBtn : {}) }}>Dare</button>
+                      </div>
+                      <textarea style={{ ...S.input, minHeight: 60 }} value={editingCard.isi_challenge} onChange={e => setEditingCard(ec => ({ ...ec, isi_challenge: e.target.value }))} />
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button style={S.primaryBtn} onClick={simpanEditKartu}>Simpan</button>
+                        <button style={S.ghostBtn} onClick={() => setEditingCard(null)}>Batal</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase" }}>{c.tipe}</div>
+                      <div style={{ fontSize: 13.5 }}>{c.isi_challenge}</div>
+                      <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                        <button style={S.deleteLink} onClick={() => setEditingCard(c)}>Edit</button>
+                        <button style={S.deleteLink} onClick={() => hapusKartu(c.id)}>Hapus</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {kartuFilterList.length === 0 && <div style={S.emptyState}>Belum ada kartu {filterRarity}.</div>}
+            </div>
+
+            <button style={{ ...S.ghostBtn, marginTop: 16, width: "100%" }} onClick={() => setShowKelolaKartu(false)}>Tutup</button>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+// ---------------- Sub-komponen: Setup ----------------
+function PCSetup({ jumlahPemain, updateJumlahPemain, namaPemain, setNamaPemain, pemainAktifAwal, setPemainAktifAwal, onMulai }) {
+  const semuaTerisi = namaPemain.every(n => true); // nama boleh kosong (auto "Pemain N")
+  return (
+    <div style={S.formCard}>
+      <div style={S.formCardTitle}>Setup Permainan</div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>Jumlah Pemain (2–20)</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+          <button style={S.ghostBtn} onClick={() => updateJumlahPemain(jumlahPemain - 1)}>–</button>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.red, minWidth: 30, textAlign: "center" }}>{jumlahPemain}</div>
+          <button style={S.ghostBtn} onClick={() => updateJumlahPemain(jumlahPemain + 1)}>+</button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>Nama Pemain</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+          {namaPemain.map((n, i) => (
+            <input
+              key={i}
+              style={S.input}
+              placeholder={`Pemain ${i + 1}`}
+              value={n}
+              onChange={e => setNamaPemain(prev => prev.map((p, idx) => idx === i ? e.target.value : p))}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>Pemain Pertama</label>
+        <select
+          style={{ ...S.input, marginTop: 8 }}
+          value={pemainAktifAwal}
+          onChange={e => setPemainAktifAwal(Number(e.target.value))}
+        >
+          {namaPemain.map((n, i) => (
+            <option key={i} value={i}>{n.trim() || `Pemain ${i + 1}`}</option>
+          ))}
+        </select>
+      </div>
+
+      <button style={{ ...S.primaryBtn, width: "100%" }} onClick={onMulai}>Mulai Permainan</button>
+    </div>
+  );
+}
+
+// ---------------- Sub-komponen: Game ----------------
+function PCGame({
+  namaPemain, scores, currentPlayerIdx, turnPhase, chosenTipe, dice, rollingDice,
+  swipeTotal, swipeProgress, revealedCard, flipped, transferState, totalKartuAktif,
+  onPilihTipe, onKocokDadu, onLanjutSwipe, onBukaKartu, onSelesaikanChallenge,
+  onMintaTransfer, onBatalTransfer, onBerikanKeRekan, onSelesaikanTransfer, onAkhiri,
+}) {
+  const pemainSekarang = namaPemain[currentPlayerIdx];
+  const rekanLain = namaPemain.filter((_, i) => i !== currentPlayerIdx);
+
+  return (
+    <div>
+      {/* Skor semua pemain */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 20 }}>
+        {namaPemain.map((n, i) => (
+          <div key={i} style={{
+            padding: "6px 14px", borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+            background: i === currentPlayerIdx ? C.red : "#f0ebe0",
+            color: i === currentPlayerIdx ? "#fff" : C.navy,
+          }}>
+            {n}: {scores[n] || 0}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <button style={S.deleteLink} onClick={onAkhiri}>Akhiri Permainan &amp; Simpan Skor</button>
+      </div>
+
+      <div style={{ textAlign: "center", fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 700, color: C.navy, marginBottom: 24 }}>
+        Giliran: {pemainSekarang}
+      </div>
+
+      {turnPhase === "pilih" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ marginBottom: 16, color: C.muted, fontSize: 14 }}>Pilih jenis challenge:</div>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
+            <button style={{ ...S.primaryBtn, padding: "16px 32px", fontSize: 16 }} onClick={() => onPilihTipe("truth")}>Truth</button>
+            <button style={{ ...S.primaryBtn, padding: "16px 32px", fontSize: 16, background: C.navy }} onClick={() => onPilihTipe("dare")}>Dare</button>
+          </div>
+        </div>
+      )}
+
+      {turnPhase === "dadu" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ marginBottom: 16, color: C.muted, fontSize: 14 }}>
+            {totalKartuAktif} kartu {chosenTipe} tersedia. Kocok dadu untuk menentukan berapa kartu yang digeser.
+          </div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>{rollingDice ? "🎲🎲" : `⚀ ${dice[0]}  ⚀ ${dice[1]}`}</div>
+          <button style={S.primaryBtn} disabled={rollingDice} onClick={onKocokDadu}>{rollingDice ? "Mengocok…" : "Kocok Dadu"}</button>
+        </div>
+      )}
+
+      {turnPhase === "swipe" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ marginBottom: 16, color: C.muted, fontSize: 14 }}>
+            Geser kartu {swipeProgress + 1} dari {swipeTotal}
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+            {Array.from({ length: swipeTotal }).map((_, i) => (
+              <div key={i} style={{
+                width: 34, height: 48, borderRadius: 5,
+                background: i <= swipeProgress ? C.navy : "#e0d8c8",
+                border: `1.5px solid ${C.gold}`,
+                transition: "background 0.2s",
+              }} />
+            ))}
+          </div>
+          <button style={S.primaryBtn} onClick={onLanjutSwipe}>
+            {swipeProgress + 1 < swipeTotal ? "Geser Kartu →" : "Buka Kartu Terakhir"}
+          </button>
+        </div>
+      )}
+
+      {turnPhase === "reveal" && revealedCard && (
+        <PCRevealCard
+          card={revealedCard}
+          flipped={flipped}
+          onBukaKartu={onBukaKartu}
+          transferState={transferState}
+          pemainSekarang={pemainSekarang}
+          onSelesaikanChallenge={onSelesaikanChallenge}
+          onMintaTransfer={onMintaTransfer}
+          onSelesaikanTransfer={onSelesaikanTransfer}
+        />
+      )}
+
+      {turnPhase === "pilihRekan" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ marginBottom: 14, fontSize: 14, color: C.muted }}>
+            Berikan challenge ini ke siapa? {pemainSekarang} akan kehilangan {pcRarityInfo(revealedCard.rarity).poin} poin.
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
+            {rekanLain.map(n => (
+              <button key={n} style={S.ghostBtn} onClick={() => onBerikanKeRekan(n)}>{n}</button>
+            ))}
+          </div>
+          <button style={S.deleteLink} onClick={onBatalTransfer}>Batal</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------- Sub-komponen: Kartu Reveal + Flip ----------------
+function PCRevealCard({ card, flipped, onBukaKartu, transferState, pemainSekarang, onSelesaikanChallenge, onMintaTransfer, onSelesaikanTransfer }) {
+  const rarity = pcRarityInfo(card.rarity);
+  const sedangDikerjakanOleh = transferState ? transferState.to : pemainSekarang;
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ perspective: 1200, margin: "0 auto 20px", width: 240, maxWidth: "80vw", aspectRatio: "5/7" }}>
+        <div
+          onClick={!flipped ? onBukaKartu : undefined}
+          style={{
+            width: "100%", height: "100%", position: "relative",
+            transformStyle: "preserve-3d", transition: "transform 0.6s",
+            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            cursor: !flipped ? "pointer" : "default",
+          }}
+        >
+          {/* Belakang kartu (tampak sebelum dibuka) */}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: 12, backfaceVisibility: "hidden",
+            background: `linear-gradient(135deg, ${C.navy}, ${C.black})`,
+            border: `2px solid ${C.gold}`, display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "Georgia,serif", fontSize: 15, color: C.gold, fontWeight: 700,
+          }}>
+            HIMA IP
+          </div>
+          {/* Depan kartu (isi challenge) */}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: 12, backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)", background: "#FAF7F2",
+            border: `3px solid ${rarity.warna}`, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box",
+            overflowY: "auto",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: rarity.warna, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+              {card.rarity} · {card.tipe} · {rarity.poin} poin
+            </div>
+            {card.gambar_url && <img src={card.gambar_url} alt="" style={{ width: "70%", borderRadius: 6, marginBottom: 8 }} />}
+            <div style={{ fontSize: 13.5, color: "#1F1B16", fontWeight: 600 }}>{card.isi_challenge}</div>
+          </div>
+        </div>
+      </div>
+
+      {!flipped ? (
+        <div style={{ color: C.muted, fontSize: 13 }}>Ketuk kartu untuk membuka</div>
+      ) : transferState ? (
+        <div>
+          <div style={{ marginBottom: 12, fontSize: 14, color: C.navy, fontWeight: 600 }}>
+            Diberikan ke {transferState.to} — apakah berhasil dikerjakan?
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button style={S.primaryBtn} onClick={() => onSelesaikanTransfer(true)}>Selesai (+{rarity.poin})</button>
+            <button style={S.ghostBtn} onClick={() => onSelesaikanTransfer(false)}>Tolak (0 poin)</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <button style={S.primaryBtn} onClick={() => onSelesaikanChallenge(true)}>Selesai (+{rarity.poin})</button>
+          <button style={S.ghostBtn} onClick={() => onSelesaikanChallenge(false)}>Tolak (0 poin)</button>
+          <button style={{ ...S.ghostBtn, color: C.red, borderColor: C.red }} onClick={onMintaTransfer}>Berikan ke Rekan</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------- Sub-komponen: Hasil Akhir ----------------
+function PCResult({ namaPemain, scores, onMainLagi }) {
+  const ranked = namaPemain.map(n => ({ nama: n, poin: scores[n] || 0 })).sort((a, b) => b.poin - a.poin);
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 700, color: C.navy, marginBottom: 20 }}>
+        🏆 Hasil Permainan
+      </div>
+      <div style={{ maxWidth: 360, margin: "0 auto 24px" }}>
+        {ranked.map((r, i) => (
+          <div key={r.nama} style={{
+            display: "flex", justifyContent: "space-between", padding: "12px 16px", marginBottom: 8,
+            borderRadius: 8, background: i === 0 ? C.gold : "#f0ebe0", color: i === 0 ? "#fff" : C.navy,
+          }}>
+            <div style={{ fontWeight: 700 }}>{i + 1}. {r.nama}</div>
+            <div style={{ fontWeight: 700 }}>{r.poin} poin</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 16 }}>Skor sudah tersimpan ke leaderboard all-time.</div>
+      <button style={S.primaryBtn} onClick={onMainLagi}>Main Lagi</button>
+    </div>
+  );
+}
+
 
 function PinPad({ value, onDigit, onBackspace, error }) {
   const dots = [0,1,2,3,4,5];
