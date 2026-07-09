@@ -1783,6 +1783,8 @@ export default function App() {
 }
 
 
+const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
 const RARITY_CONFIG = [
   { name: "Common",   warna: "#3fa34d", poin: 1,  weight: 62.00 },
   { name: "Uncommon", warna: "#8a8a8a", poin: 3,  weight: 22.00 },
@@ -1818,18 +1820,24 @@ function PlayingCardPage({ isAdmin }) {
   const [chosenTipe, setChosenTipe] = useState(null);
   const [dice, setDice] = useState([1, 1]);
   const [rollingDice, setRollingDice] = useState(false);
+  const [showingResult, setShowingResult] = useState(false);
+  const [diceCountdown, setDiceCountdown] = useState(5);
   const [swipeTotal, setSwipeTotal] = useState(0);
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [revealedCard, setRevealedCard] = useState(null);
   const [flipped, setFlipped] = useState(false);
   const [transferState, setTransferState] = useState(null); // { to, poin }
+  const rollLockRef = useRef(false);
 
   // admin kelola kartu
   const [showKelolaKartu, setShowKelolaKartu] = useState(false);
   const [filterRarity, setFilterRarity] = useState("Common");
-  const [newCard, setNewCard] = useState({ tipe: "truth", isi_challenge: "", gambar_url: "" });
+  const [newCard, setNewCard] = useState({ tipe: "truth", isi_challenge: "", gambar_depan: "", gambar_belakang: "" });
   const [editingCard, setEditingCard] = useState(null);
-  const cardImgRef = useRef(null);
+  const cardImgDepanRef = useRef(null);
+  const cardImgBelakangRef = useRef(null);
+  const editImgDepanRef = useRef(null);
+  const editImgBelakangRef = useRef(null);
 
   // leaderboard
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -1837,6 +1845,19 @@ function PlayingCardPage({ isAdmin }) {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   useEffect(() => { loadCards(); }, []);
+
+  // Hitung mundur 5 detik menampilkan hasil dadu sebelum otomatis lanjut ke swipe
+  useEffect(() => {
+    if (!showingResult) return;
+    if (diceCountdown <= 0) {
+      setShowingResult(false);
+      setTurnPhase("swipe");
+      rollLockRef.current = false;
+      return;
+    }
+    const t = setTimeout(() => setDiceCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showingResult, diceCountdown]);
 
   async function loadCards() {
     setLoadingCards(true);
@@ -1896,17 +1917,30 @@ function PlayingCardPage({ isAdmin }) {
     setTurnPhase("dadu");
   }
 
+  // Kocok dadu: ~1.5 detik animasi kocokan (angka berkedip acak),
+  // lalu hasil akhir ditampilkan diam selama 5 detik sebelum otomatis lanjut ke swipe.
   function kocokDadu() {
+    if (rollLockRef.current) return;
+    rollLockRef.current = true;
+    setShowingResult(false);
     setRollingDice(true);
+
+    const flickerInterval = setInterval(() => {
+      setDice([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]);
+    }, 90);
+
     setTimeout(() => {
+      clearInterval(flickerInterval);
       const d1 = 1 + Math.floor(Math.random() * 6);
       const d2 = 1 + Math.floor(Math.random() * 6);
       setDice([d1, d2]);
       setSwipeTotal(d1 + d2);
       setSwipeProgress(0);
       setRollingDice(false);
-      setTurnPhase("swipe");
-    }, 700);
+      setDiceCountdown(5);
+      setShowingResult(true);
+      // rollLockRef dilepas otomatis oleh useEffect countdown di atas
+    }, 1500);
   }
 
   function pickCardForTurn() {
@@ -1962,12 +1996,10 @@ function PlayingCardPage({ isAdmin }) {
     setCurrentPlayerIdx(i => (i + 1) % namaPemain.length);
   }
 
-  // Pemain saat ini menyelesaikan / menolak challenge miliknya sendiri
   function selesaikanChallenge(berhasil) {
     tutupTurn(namaPemain[currentPlayerIdx], berhasil);
   }
 
-  // Berikan challenge ke rekan lain — poin kartu langsung dipotong dari pemberi
   function berikanKeRekan(namaRekan) {
     const poin = pcRarityInfo(revealedCard.rarity).poin;
     const pemberi = namaPemain[currentPlayerIdx];
@@ -1976,7 +2008,6 @@ function PlayingCardPage({ isAdmin }) {
     setTurnPhase("reveal");
   }
 
-  // Rekan yang menerima limpahan challenge menyelesaikan / menolaknya
   function selesaikanTransfer(berhasil) {
     tutupTurn(transferState.to, berhasil);
   }
@@ -1997,15 +2028,16 @@ function PlayingCardPage({ isAdmin }) {
 
   // ---- Admin: CRUD kartu ----
   async function tambahKartu() {
-    if (!newCard.isi_challenge.trim()) return;
+    if (!newCard.gambar_depan) return; // wajib ada desain kartu depan
     try {
       await db.insert("playing_cards", {
         rarity: filterRarity,
         tipe: newCard.tipe,
-        isi_challenge: newCard.isi_challenge.trim(),
-        gambar_url: newCard.gambar_url || null,
+        isi_challenge: newCard.isi_challenge.trim() || "(tanpa catatan teks — sudah ada di desain kartu)",
+        gambar_depan: newCard.gambar_depan,
+        gambar_belakang: newCard.gambar_belakang || null,
       });
-      setNewCard({ tipe: "truth", isi_challenge: "", gambar_url: "" });
+      setNewCard({ tipe: "truth", isi_challenge: "", gambar_depan: "", gambar_belakang: "" });
       loadCards();
     } catch (e) {}
   }
@@ -2015,7 +2047,8 @@ function PlayingCardPage({ isAdmin }) {
       await db.update("playing_cards", editingCard.id, {
         tipe: editingCard.tipe,
         isi_challenge: editingCard.isi_challenge,
-        gambar_url: editingCard.gambar_url || null,
+        gambar_depan: editingCard.gambar_depan || null,
+        gambar_belakang: editingCard.gambar_belakang || null,
       });
       setEditingCard(null);
       loadCards();
@@ -2060,6 +2093,8 @@ function PlayingCardPage({ isAdmin }) {
           chosenTipe={chosenTipe}
           dice={dice}
           rollingDice={rollingDice}
+          showingResult={showingResult}
+          diceCountdown={diceCountdown}
           swipeTotal={swipeTotal}
           swipeProgress={swipeProgress}
           revealedCard={revealedCard}
@@ -2138,13 +2173,25 @@ function PlayingCardPage({ isAdmin }) {
                 <button onClick={() => setNewCard(c => ({ ...c, tipe: "truth" }))} style={{ ...S.ghostBtn, flex: 1, ...(newCard.tipe === "truth" ? S.primaryBtn : {}) }}>Truth</button>
                 <button onClick={() => setNewCard(c => ({ ...c, tipe: "dare" }))} style={{ ...S.ghostBtn, flex: 1, ...(newCard.tipe === "dare" ? S.primaryBtn : {}) }}>Dare</button>
               </div>
-              <textarea style={{ ...S.input, minHeight: 70 }} placeholder="Isi challenge…" value={newCard.isi_challenge} onChange={e => setNewCard(c => ({ ...c, isi_challenge: e.target.value }))} />
-              <input ref={cardImgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 750, 0.75).then(src => setNewCard(c => ({ ...c, gambar_url: src })))} />
-              <button style={{ ...S.ghostBtn, marginTop: 8 }} onClick={() => cardImgRef.current.click()}>{newCard.gambar_url ? "Ganti Gambar" : "+ Gambar (opsional)"}</button>
+
+              <input ref={cardImgDepanRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 900, 0.85).then(src => setNewCard(c => ({ ...c, gambar_depan: src })))} />
+              <button style={{ ...S.ghostBtn, width: "100%", marginBottom: 8 }} onClick={() => cardImgDepanRef.current.click()}>
+                {newCard.gambar_depan ? "✓ Desain Depan Terpasang — Ganti" : "+ Desain Kartu Depan (wajib)"}
+              </button>
+              {newCard.gambar_depan && <img src={newCard.gambar_depan} alt="" style={{ width: 90, borderRadius: 6, display: "block", margin: "0 auto 10px" }} />}
+
+              <input ref={cardImgBelakangRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 900, 0.85).then(src => setNewCard(c => ({ ...c, gambar_belakang: src })))} />
+              <button style={{ ...S.ghostBtn, width: "100%", marginBottom: 10 }} onClick={() => cardImgBelakangRef.current.click()}>
+                {newCard.gambar_belakang ? "✓ Desain Belakang Terpasang — Ganti" : "+ Desain Kartu Belakang (opsional)"}
+              </button>
+              {newCard.gambar_belakang && <img src={newCard.gambar_belakang} alt="" style={{ width: 90, borderRadius: 6, display: "block", margin: "0 auto 10px" }} />}
+
+              <textarea style={{ ...S.input, minHeight: 50 }} placeholder="Catatan teks challenge (opsional, tidak tampil di kartu)…" value={newCard.isi_challenge} onChange={e => setNewCard(c => ({ ...c, isi_challenge: e.target.value }))} />
+
               <button style={{ ...S.primaryBtn, marginTop: 10, width: "100%" }} onClick={tambahKartu}>Simpan Kartu</button>
             </div>
 
-            <div style={{ marginTop: 16, maxHeight: 260, overflowY: "auto" }}>
+            <div style={{ marginTop: 16, maxHeight: 320, overflowY: "auto" }}>
               {kartuFilterList.map(c => (
                 <div key={c.id} style={{ padding: "10px 0", borderBottom: "1px solid #e0d8c8" }}>
                   {editingCard?.id === c.id ? (
@@ -2153,19 +2200,28 @@ function PlayingCardPage({ isAdmin }) {
                         <button onClick={() => setEditingCard(ec => ({ ...ec, tipe: "truth" }))} style={{ ...S.ghostBtn, flex: 1, ...(editingCard.tipe === "truth" ? S.primaryBtn : {}) }}>Truth</button>
                         <button onClick={() => setEditingCard(ec => ({ ...ec, tipe: "dare" }))} style={{ ...S.ghostBtn, flex: 1, ...(editingCard.tipe === "dare" ? S.primaryBtn : {}) }}>Dare</button>
                       </div>
-                      <textarea style={{ ...S.input, minHeight: 60 }} value={editingCard.isi_challenge} onChange={e => setEditingCard(ec => ({ ...ec, isi_challenge: e.target.value }))} />
+                      <input ref={editImgDepanRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 900, 0.85).then(src => setEditingCard(ec => ({ ...ec, gambar_depan: src })))} />
+                      <button style={{ ...S.ghostBtn, width: "100%", marginBottom: 8 }} onClick={() => editImgDepanRef.current.click()}>Ganti Desain Depan</button>
+                      {editingCard.gambar_depan && <img src={editingCard.gambar_depan} alt="" style={{ width: 80, borderRadius: 6, display: "block", margin: "0 auto 8px" }} />}
+                      <input ref={editImgBelakangRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && compressImage(e.target.files[0], 900, 0.85).then(src => setEditingCard(ec => ({ ...ec, gambar_belakang: src })))} />
+                      <button style={{ ...S.ghostBtn, width: "100%", marginBottom: 8 }} onClick={() => editImgBelakangRef.current.click()}>Ganti Desain Belakang</button>
+                      {editingCard.gambar_belakang && <img src={editingCard.gambar_belakang} alt="" style={{ width: 80, borderRadius: 6, display: "block", margin: "0 auto 8px" }} />}
+                      <textarea style={{ ...S.input, minHeight: 50 }} value={editingCard.isi_challenge} onChange={e => setEditingCard(ec => ({ ...ec, isi_challenge: e.target.value }))} />
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <button style={S.primaryBtn} onClick={simpanEditKartu}>Simpan</button>
                         <button style={S.ghostBtn} onClick={() => setEditingCard(null)}>Batal</button>
                       </div>
                     </div>
                   ) : (
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase" }}>{c.tipe}</div>
-                      <div style={{ fontSize: 13.5 }}>{c.isi_challenge}</div>
-                      <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                        <button style={S.deleteLink} onClick={() => setEditingCard(c)}>Edit</button>
-                        <button style={S.deleteLink} onClick={() => hapusKartu(c.id)}>Hapus</button>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      {c.gambar_depan && <img src={c.gambar_depan} alt="" style={{ width: 44, borderRadius: 4, flexShrink: 0 }} />}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase" }}>{c.tipe}</div>
+                        <div style={{ fontSize: 12.5 }}>{c.isi_challenge}</div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                          <button style={S.deleteLink} onClick={() => setEditingCard(c)}>Edit</button>
+                          <button style={S.deleteLink} onClick={() => hapusKartu(c.id)}>Hapus</button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2184,7 +2240,6 @@ function PlayingCardPage({ isAdmin }) {
 
 // ---------------- Sub-komponen: Setup ----------------
 function PCSetup({ jumlahPemain, updateJumlahPemain, namaPemain, setNamaPemain, pemainAktifAwal, setPemainAktifAwal, onMulai }) {
-  const semuaTerisi = namaPemain.every(n => true); // nama boleh kosong (auto "Pemain N")
   return (
     <div style={S.formCard}>
       <div style={S.formCardTitle}>Setup Permainan</div>
@@ -2233,7 +2288,7 @@ function PCSetup({ jumlahPemain, updateJumlahPemain, namaPemain, setNamaPemain, 
 
 // ---------------- Sub-komponen: Game ----------------
 function PCGame({
-  namaPemain, scores, currentPlayerIdx, turnPhase, chosenTipe, dice, rollingDice,
+  namaPemain, scores, currentPlayerIdx, turnPhase, chosenTipe, dice, rollingDice, showingResult, diceCountdown,
   swipeTotal, swipeProgress, revealedCard, flipped, transferState, totalKartuAktif,
   onPilihTipe, onKocokDadu, onLanjutSwipe, onBukaKartu, onSelesaikanChallenge,
   onMintaTransfer, onBatalTransfer, onBerikanKeRekan, onSelesaikanTransfer, onAkhiri,
@@ -2243,7 +2298,6 @@ function PCGame({
 
   return (
     <div>
-      {/* Skor semua pemain */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 20 }}>
         {namaPemain.map((n, i) => (
           <div key={i} style={{
@@ -2277,32 +2331,27 @@ function PCGame({
       {turnPhase === "dadu" && (
         <div style={{ textAlign: "center" }}>
           <div style={{ marginBottom: 16, color: C.muted, fontSize: 14 }}>
-            {totalKartuAktif} kartu {chosenTipe} tersedia. Kocok dadu untuk menentukan berapa kartu yang digeser.
+            {totalKartuAktif} kartu {chosenTipe} tersedia.
           </div>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>{rollingDice ? "🎲🎲" : `⚀ ${dice[0]}  ⚀ ${dice[1]}`}</div>
-          <button style={S.primaryBtn} disabled={rollingDice} onClick={onKocokDadu}>{rollingDice ? "Mengocok…" : "Kocok Dadu"}</button>
+          <div style={{ fontSize: 56, marginBottom: 10, letterSpacing: 10 }}>
+            {DICE_FACES[dice[0] - 1]} {DICE_FACES[dice[1] - 1]}
+          </div>
+          {showingResult ? (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>Total: {dice[0]} + {dice[1]} = {dice[0] + dice[1]} kartu</div>
+              <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>Lanjut otomatis dalam {diceCountdown} detik…</div>
+            </div>
+          ) : (
+            <div style={{ height: 38 }} />
+          )}
+          <button style={S.primaryBtn} disabled={rollingDice || showingResult} onClick={onKocokDadu}>
+            {rollingDice ? "Mengocok…" : showingResult ? "Menunggu…" : "Kocok Dadu"}
+          </button>
         </div>
       )}
 
       {turnPhase === "swipe" && (
-        <div style={{ textAlign: "center" }}>
-          <div style={{ marginBottom: 16, color: C.muted, fontSize: 14 }}>
-            Geser kartu {swipeProgress + 1} dari {swipeTotal}
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
-            {Array.from({ length: swipeTotal }).map((_, i) => (
-              <div key={i} style={{
-                width: 34, height: 48, borderRadius: 5,
-                background: i <= swipeProgress ? C.navy : "#e0d8c8",
-                border: `1.5px solid ${C.gold}`,
-                transition: "background 0.2s",
-              }} />
-            ))}
-          </div>
-          <button style={S.primaryBtn} onClick={onLanjutSwipe}>
-            {swipeProgress + 1 < swipeTotal ? "Geser Kartu →" : "Buka Kartu Terakhir"}
-          </button>
-        </div>
+        <PCSwipeStack swipeTotal={swipeTotal} swipeProgress={swipeProgress} onLanjutSwipe={onLanjutSwipe} />
       )}
 
       {turnPhase === "reveal" && revealedCard && (
@@ -2335,10 +2384,65 @@ function PCGame({
   );
 }
 
+// ---------------- Sub-komponen: Tumpukan Kartu Geser (swipe) ----------------
+function PCSwipeStack({ swipeTotal, swipeProgress, onLanjutSwipe }) {
+  const [animating, setAnimating] = useState(false);
+  const [direction, setDirection] = useState("left");
+
+  const remaining = swipeTotal - swipeProgress; // termasuk kartu paling depan yang akan digeser
+
+  function handleSwipe() {
+    if (animating) return;
+    const dir = swipeProgress % 2 === 0 ? "left" : "right";
+    setDirection(dir);
+    setAnimating(true);
+    setTimeout(() => {
+      setAnimating(false);
+      onLanjutSwipe();
+    }, 380);
+  }
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ marginBottom: 14, color: C.muted, fontSize: 14 }}>
+        Kartu {swipeProgress + 1} dari {swipeTotal}
+      </div>
+      <div style={{ position: "relative", width: 170, height: 238, margin: "0 auto 22px" }}>
+        {Array.from({ length: remaining }).map((_, idx) => {
+          const depth = idx; // 0 = paling depan (yang sedang digeser)
+          const isFront = depth === 0;
+          const stackOffset = depth * 4;
+          const rotate = (depth % 2 === 0 ? -1 : 1) * depth * 1.4;
+          let style = {
+            position: "absolute", inset: 0, borderRadius: 12,
+            background: `linear-gradient(135deg, ${C.navy}, ${C.black})`,
+            border: `2px solid ${C.gold}`,
+            transform: `translate(${stackOffset}px, ${-stackOffset}px) rotate(${rotate}deg)`,
+            transition: "transform 0.38s cubic-bezier(.2,.7,.3,1), opacity 0.38s ease",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: C.gold, fontFamily: "Georgia,serif", fontWeight: 700, fontSize: 13,
+            zIndex: remaining - depth, boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+          };
+          if (isFront && animating) {
+            style = {
+              ...style,
+              transform: `translate(${direction === "left" ? -240 : 240}px, -40px) rotate(${direction === "left" ? -30 : 30}deg)`,
+              opacity: 0,
+            };
+          }
+          return <div key={`${remaining}-${idx}`} style={style}>{isFront ? "HIMA IP" : ""}</div>;
+        })}
+      </div>
+      <button style={S.primaryBtn} disabled={animating} onClick={handleSwipe}>
+        {swipeProgress + 1 < swipeTotal ? "Geser Kartu →" : "Buka Kartu Terakhir"}
+      </button>
+    </div>
+  );
+}
+
 // ---------------- Sub-komponen: Kartu Reveal + Flip ----------------
 function PCRevealCard({ card, flipped, onBukaKartu, transferState, pemainSekarang, onSelesaikanChallenge, onMintaTransfer, onSelesaikanTransfer }) {
   const rarity = pcRarityInfo(card.rarity);
-  const sedangDikerjakanOleh = transferState ? transferState.to : pemainSekarang;
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -2355,25 +2459,39 @@ function PCRevealCard({ card, flipped, onBukaKartu, transferState, pemainSekaran
           {/* Belakang kartu (tampak sebelum dibuka) */}
           <div style={{
             position: "absolute", inset: 0, borderRadius: 12, backfaceVisibility: "hidden",
-            background: `linear-gradient(135deg, ${C.navy}, ${C.black})`,
-            border: `2px solid ${C.gold}`, display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "Georgia,serif", fontSize: 15, color: C.gold, fontWeight: 700,
+            overflow: "hidden", border: `2px solid ${C.gold}`,
           }}>
-            HIMA IP
+            {card.gambar_belakang ? (
+              <img src={card.gambar_belakang} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+              <div style={{
+                width: "100%", height: "100%",
+                background: `linear-gradient(135deg, ${C.navy}, ${C.black})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "Georgia,serif", fontSize: 15, color: C.gold, fontWeight: 700,
+              }}>
+                HIMA IP
+              </div>
+            )}
           </div>
-          {/* Depan kartu (isi challenge) */}
+          {/* Depan kartu — full desain hasil upload, tidak ada teks/label tambahan */}
           <div style={{
             position: "absolute", inset: 0, borderRadius: 12, backfaceVisibility: "hidden",
-            transform: "rotateY(180deg)", background: "#FAF7F2",
-            border: `3px solid ${rarity.warna}`, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box",
-            overflowY: "auto",
+            transform: "rotateY(180deg)", overflow: "hidden", border: `3px solid ${rarity.warna}`,
           }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: rarity.warna, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-              {card.rarity} · {card.tipe} · {rarity.poin} poin
-            </div>
-            {card.gambar_url && <img src={card.gambar_url} alt="" style={{ width: "70%", borderRadius: 6, marginBottom: 8 }} />}
-            <div style={{ fontSize: 13.5, color: "#1F1B16", fontWeight: 600 }}>{card.isi_challenge}</div>
+            {card.gambar_depan ? (
+              <img src={card.gambar_depan} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+              <div style={{
+                width: "100%", height: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: rarity.warna, textTransform: "uppercase", marginBottom: 6 }}>
+                  {card.rarity} · {card.tipe}
+                </div>
+                <div style={{ fontSize: 13.5, color: "#1F1B16", fontWeight: 600 }}>{card.isi_challenge}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2425,7 +2543,6 @@ function PCResult({ namaPemain, scores, onMainLagi }) {
     </div>
   );
 }
-
 
 function PinPad({ value, onDigit, onBackspace, error }) {
   const dots = [0,1,2,3,4,5];
