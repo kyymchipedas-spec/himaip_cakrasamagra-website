@@ -1271,13 +1271,30 @@ export default function App() {
                   <li>Mendorong terciptanya organisasi yang inklusif, partisipatif, dan responsif terhadap dinamika bersama.</li>
                 </ul>
                 <SectionHeader eyebrow="IDENTITAS" title="Makna Logo" light />
-                <div style={S.maknaLogoRow}>
-                  <div style={S.maknaLogoImgWrap}>
-                    <img src="/logo-kabinet.png" alt="Logo" style={S.maknaLogoImg} onError={e => e.target.style.display="none"} />
+                <div style={S.maknaLogoList}>
+                  <div style={S.maknaLogoItem}>
+                    <div style={S.maknaLogoIconWrap}>
+                      <img src="/makna-logo-pusaran.png" alt="Pusaran" style={S.maknaLogoIcon} onError={e => e.target.style.display="none"} />
+                    </div>
+                    <p style={S.maknaLogoItemText}>Representasi dari (<strong style={{color:C.gold}}>Cakram</strong>) atau pusaran air yang berputar menuju inti yang berada di tengah, dan 5 (lima) pilar mewakili misi.</p>
                   </div>
-                  <div style={S.maknaLogoText}>
-                    <p style={S.visiText}>Logo <strong style={{color:C.gold}}>Cakra Samagra</strong> merupakan representasi dari pusaran air (cakram) yang berputar menuju titik inti di bagian tengah sebagai simbol organisasi. Titik pusat menggambarkan HIMA IP sebagai inti yang menjadi pusat pergerakan, dikelilingi oleh pusaran yang mencerminkan dinamika organisasi. Lima pilar yang mengelilingi titik pusat melambangkan lima misi organisasi yang menjadi penopang sekaligus penjaga arah pergerakan HIMA IP. Garis lengkung pada bagian luar melambangkan pelindung yang membentuk pusaran terkuat, menggambarkan kekuatan dan kesatuan dalam menjaga keberlangsungan organisasi.</p>
-                    <p style={{...S.visiText,marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> pada logo melambangkan kemewahan, kekayaan, dan kemakmuran. Warna ini juga menjadi simbol kekuasaan yang mencerminkan kehormatan, kewibawaan, serta harapan agar HIMA IP mampu terus berkembang sebagai organisasi yang kuat, bermartabat, dan berpengaruh dalam menjalankan visi dan misinya.</p>
+                  <div style={S.maknaLogoItem}>
+                    <div style={S.maknaLogoIconWrap}>
+                      <img src="/makna-logo-titik.png" alt="Titik Tengah" style={S.maknaLogoIcon} onError={e => e.target.style.display="none"} />
+                    </div>
+                    <p style={S.maknaLogoItemText}>Titik tengah adalah organisasi itu sendiri yang dikelilingi oleh pusaran dan dijaga oleh 5 (lima) pilar.</p>
+                  </div>
+                  <div style={S.maknaLogoItem}>
+                    <div style={S.maknaLogoIconWrap}>
+                      <img src="/makna-logo-lengkung.png" alt="Garis Lengkung" style={S.maknaLogoIcon} onError={e => e.target.style.display="none"} />
+                    </div>
+                    <p style={S.maknaLogoItemText}>Garis lengkung bagian luar melambangkan pelindung dan merupakan pusaran paling kuat.</p>
+                  </div>
+                  <div style={S.maknaLogoItem}>
+                    <div style={S.maknaLogoIconWrap}>
+                      <img src="/makna-logo-warna.png" alt="Warna Emas" style={S.maknaLogoIcon} onError={e => e.target.style.display="none"} />
+                    </div>
+                    <p style={{...S.maknaLogoItemText,marginBottom:0}}>Warna <strong style={{color:C.gold}}>emas</strong> melambangkan kemewahan, kekayaan, dan kemakmuran menjadikannya simbol kekuasaan.</p>
                   </div>
                 </div>
               </div>
@@ -2991,10 +3008,11 @@ const S = {
   visiInner:{maxWidth:800,margin:"0 auto",padding:"0 40px"},
   visiText:{fontSize:15.5,lineHeight:1.75,color:"rgba(255,255,255,0.85)",marginBottom:24,marginTop:0},
   misiList:{paddingLeft:20,color:"rgba(255,255,255,0.85)",lineHeight:2,fontSize:15.5,marginBottom:40},
-  maknaLogoRow:{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"},
-  maknaLogoImgWrap:{flexShrink:0,width:160,height:160,background:"rgba(255,255,255,0.08)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid rgba(182,138,61,0.3)"},
-  maknaLogoImg:{width:130,height:130,objectFit:"contain"},
-  maknaLogoText:{flex:1,minWidth:200},
+  maknaLogoList:{display:"flex",flexDirection:"column",gap:30},
+  maknaLogoItem:{display:"flex",alignItems:"center",gap:26,flexWrap:"wrap"},
+  maknaLogoIconWrap:{flexShrink:0,width:92,height:92,display:"flex",alignItems:"center",justifyContent:"center"},
+  maknaLogoIcon:{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"},
+  maknaLogoItemText:{flex:1,minWidth:220,fontSize:15.5,lineHeight:1.75,color:"rgba(255,255,255,0.85)",marginBottom:0,marginTop:0},
   main:{maxWidth:1100,margin:"0 auto",padding:"90px 40px 80px"},
   formCard:{background:C.white,border:"1px solid #e0d8c8",borderRadius:6,padding:22,marginBottom:30},
   formCardTitle:{fontWeight:700,marginBottom:14,fontSize:17,color:C.navy},
